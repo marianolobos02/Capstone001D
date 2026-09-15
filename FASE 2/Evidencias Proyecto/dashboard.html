@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Colegio Nuevo Horizonte — Panel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div class="app-shell">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="login-crest">
+      <div class="mark">NH</div>
+      <div class="school-name">Colegio<br>Nuevo Horizonte</div>
+    </div>
+
+    <ul class="nav-list">
+      <li><button class="nav-link" data-section="inicio"><span class="dot"></span>Inicio</button></li>
+      <li><button class="nav-link" data-section="perfil"><span class="dot"></span>Perfil</button></li>
+      <li><button class="nav-link" data-section="cursos"><span class="dot"></span>Cursos</button></li>
+      <li><button class="nav-link" data-section="calendario"><span class="dot"></span>Calendario</button></li>
+      <li><button class="nav-link" data-section="notas"><span class="dot"></span>Notas / Calificaciones</button></li>
+      <li><button class="nav-link" data-section="mensajes"><span class="dot"></span>Mensajes</button></li>
+    </ul>
+
+    <div class="sidebar-footer">
+      <button class="logout-link" id="logoutBtn"><span class="dot"></span>Cerrar sesión</button>
+    </div>
+  </aside>
+
+  <div class="main-col">
+    <header class="topbar">
+      <button class="mobile-toggle" id="mobileToggle">Menú</button>
+      <div class="topbar-greeting">
+        <h1 id="greetingTitle">Hola</h1>
+        <div class="date" id="greetingDate"></div>
+      </div>
+      <div class="topbar-user">
+        <div class="avatar" id="topAvatar">--</div>
+      </div>
+    </header>
+
+    <main class="content" id="content">
+      <!-- El contenido de cada sección se inyecta con JavaScript -->
+    </main>
+  </div>
+
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/dashboard.js"></script>
+</body>
+</html>
