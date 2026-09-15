@@ -71,11 +71,16 @@
 
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
 <script src="js/data.js"></script>
 <script>
-  // Si ya hay una sesión activa, redirige directo al panel.
-  if (getSession()) {
-    window.location.href = "dashboard.html";
+  // El login de las cuentas demo no depende de Firebase: Firebase se usa
+  // solamente para guardar la asistencia después de entrar al panel.
+  const sessionValue = typeof getSession === "function" ? getSession() : localStorage.getItem("academy7_session");
+  if (sessionValue) {
+    window.location.replace("dashboard.html");
   }
 
   const form = document.getElementById("loginForm");
@@ -96,11 +101,14 @@
     e.preventDefault();
     const username = usernameInput.value;
     const password = passwordInput.value;
-    const user = findUser(username, password);
+    const user = typeof findUser === "function"
+      ? findUser(username, password)
+      : (window.ACADEMY7_DEMO_ACCOUNTS || []).find((account) => account.username === username.trim() && account.password === password);
 
     if (user) {
-      setSession(user.username);
-      window.location.href = "dashboard.html";
+      if (typeof setSession === "function") setSession(user.username);
+      else localStorage.setItem("academy7_session", user.username);
+      window.location.replace("dashboard.html");
     } else {
       errorBox.classList.add("show");
     }

@@ -456,6 +456,23 @@ function getCourseAttendanceRecords(course) {
   return Array.isArray(course.attendanceRecords) ? course.attendanceRecords : [];
 }
 
+async function hydrateCourseAttendance(course) {
+  if (!window.Academy7Firebase?.isAvailable?.()) return;
+  try {
+    const remoteRecords = await window.Academy7Firebase.loadCourseAttendance(currentUser.username, course.id);
+    if (!remoteRecords.length) return;
+    course.attendanceRecords = remoteRecords;
+    persistDatabase(db);
+    // No reemplazar toda la vista si el docente ya seleccionó un alumno;
+    // el render asíncrono de Firebase no debe borrar su detalle abierto.
+    if (document.getElementById("courseAttendancePanel") && !document.querySelector(".student-select-row.selected")) {
+      renderTeacherCourseDetail(course.id);
+    }
+  } catch (error) {
+    console.warn("Academy7: no se pudo leer asistencia desde Firestore; se conserva el respaldo local.", error);
+  }
+}
+
 function getStudentCourseAttendance(course, student) {
   const records = getCourseAttendanceRecords(course)
     .map((session) => session.records?.[student.username])
@@ -653,9 +670,20 @@ function renderTeacherCourseDetail(courseId) {
     if (existing) existing.records = records;
     else course.attendanceRecords.push({ fecha, records });
     persistDatabase(db);
-    renderTeacherCourseDetail(course.id);
-    document.getElementById("courseAttendancePanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const feedback = document.getElementById("attendanceSessionFeedback");
+    const saveRemote = window.Academy7Firebase?.isAvailable?.()
+      ? window.Academy7Firebase.saveCourseAttendance(currentUser.username, course.id, fecha, records)
+      : Promise.reject(new Error("Firestore no disponible"));
+    saveRemote.then(() => {
+      renderTeacherCourseDetail(course.id, false);
+      document.getElementById("attendanceSessionFeedback")?.replaceChildren(document.createTextNode("Guardado en Firebase"));
+    }).catch((error) => {
+      console.warn("Academy7: no se pudo guardar en Firestore; se mantuvo el registro local.", error);
+      renderTeacherCourseDetail(course.id, false);
+      document.getElementById("attendanceSessionFeedback")?.replaceChildren(document.createTextNode("Guardado local; Firebase requiere reglas o autenticación"));
+    });
   });
+  hydrateCourseAttendance(course);
 }
 
 // ---------- Horarios y calendario ----------
