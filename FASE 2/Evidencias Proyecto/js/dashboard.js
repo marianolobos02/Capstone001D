@@ -1,5 +1,5 @@
 /* =========================================================
-   Colegio Nuevo Horizonte — Panel principal
+   Academy7 — Panel principal
    ========================================================= */
 
 // --- Guard de sesión ---
