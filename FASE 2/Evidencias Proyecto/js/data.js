@@ -1,5 +1,5 @@
 /* =========================================================
-   Colegio Nuevo Horizonte — Datos simulados
+   Academy7 — Datos simulados
    Se inicializan en localStorage la primera vez que se abre.
    ========================================================= */
 
@@ -16,7 +16,7 @@ function seedDatabase() {
         rol: "Estudiante",
         curso: "4to Medio A",
         rut: "21.345.678-9",
-        correo: "mfernanda.rojas@colegionh.cl",
+        correo: "mfernanda.rojas@academy7.cl",
         iniciales: "MR"
       },
       {
@@ -26,7 +26,7 @@ function seedDatabase() {
         rol: "Estudiante",
         curso: "3ro Medio B",
         rut: "20.987.654-3",
-        correo: "joaquin.gomez@colegionh.cl",
+        correo: "joaquin.gomez@academy7.cl",
         iniciales: "JG"
       }
     ],
