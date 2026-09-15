@@ -968,3 +968,122 @@ button {
   .attendance-ring small { font-size: 8px; }
   .inline-metrics { gap: 13px; }
 }
+
+
+/* ---------- Teacher detail and messaging ---------- */
+.student-select-row { cursor: pointer; transition: background .15s ease; }
+.student-select-row:hover, .student-select-row:focus, .student-select-row.selected { background: #FBF7EA; outline: none; }
+.student-select-row.selected td:first-child { box-shadow: inset 3px 0 0 var(--gold); }
+.student-detail-panel { padding: 25px 26px; border-top: 3px solid var(--gold); }
+.compact-empty { padding: 25px 15px; }
+.student-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; border-bottom: 1px solid var(--line-soft); padding-bottom: 20px; margin-bottom: 20px; }
+.student-detail-person { display: flex; align-items: center; gap: 16px; }
+.student-detail-person h3 { font-family: var(--font-display); font-size: 23px; font-weight: 500; margin: 0 0 3px; }
+.student-detail-person p { color: var(--ink-muted); font-size: 12.5px; margin: 0; }
+.student-detail-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 20px; }
+.student-detail-section { background: #FBFAF6; border: 1px solid var(--line-soft); padding: 18px; }
+.detail-section-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.detail-section-title h4 { font-family: var(--font-display); font-size: 17px; font-weight: 500; margin: 0; }
+.assessment-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; }
+.assessment-card { background: #fff; border: 1px solid var(--line-soft); padding: 11px 9px; display: flex; flex-direction: column; gap: 4px; text-align: center; }
+.assessment-card span { color: var(--ink-muted); font-size: 10.5px; }
+.assessment-card strong { font-family: var(--font-display); font-size: 22px; }
+.assessment-card small { color: var(--green); font-size: 9.5px; }
+.detail-percent { font-family: var(--font-display); color: var(--green); font-size: 24px; }
+.detail-muted { color: var(--ink-muted); font-size: 11.5px; line-height: 1.5; margin: 14px 0 0; }
+.warnings-section { margin-top: 20px; }
+.student-warning-list { display: flex; flex-direction: column; gap: 8px; }
+.student-warning-item { display: flex; align-items: flex-start; gap: 13px; background: #fff; border-left: 3px solid var(--brick); padding: 12px 14px; }
+.warning-date { color: var(--brick); font-size: 11px; font-weight: 600; min-width: 88px; }
+.student-warning-item strong { font-size: 12.5px; }
+.student-warning-item p { color: var(--ink-muted); font-size: 12px; line-height: 1.45; margin: 3px 0 0; }
+
+.message-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; background: var(--bg-panel); border: 1px solid var(--line-soft); padding: 12px 16px; margin-bottom: 14px; color: var(--ink-muted); font-size: 12px; }
+.message-toolbar strong { color: var(--ink); font-family: var(--font-display); font-size: 18px; }
+.message-filters { display: flex; gap: 5px; }
+.message-filter { border: 1px solid var(--line); background: transparent; color: var(--ink-muted); padding: 6px 11px; border-radius: 20px; font-size: 11.5px; }
+.message-filter:hover, .message-filter.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+.teacher-msg-layout { min-height: 470px; }
+.message-related { color: var(--gold); font-size: 10.5px; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msg-item.unread { background: #FFFCF2; }
+.message-detail-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.message-recipient-pill { border-radius: 15px; padding: 4px 9px; font-size: 10.5px; font-weight: 600; }
+.message-recipient-pill.apoderado { color: #79531F; background: #F5DFC1; }
+.message-recipient-pill.estudiante { color: #29466F; background: #DCE5F2; }
+.message-detail .meta { margin: 0; }
+.message-recipient { color: var(--ink-muted); border-bottom: 1px solid var(--line-soft); padding-bottom: 14px; margin-bottom: 20px; font-size: 12.5px; }
+.message-recipient strong { color: var(--ink); margin-right: 9px; }
+.message-recipient span { color: var(--gold); }
+.message-reply { margin-top: 26px; }
+
+@media (max-width: 800px) {
+  .student-detail-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 600px) {
+  .student-detail-header, .message-toolbar { align-items: flex-start; flex-direction: column; }
+  .assessment-grid { grid-template-columns: repeat(2, 1fr); }
+  .message-filters { flex-wrap: wrap; }
+}
+
+
+/* ---------- Manual teacher editing controls ---------- */
+.teacher-edit-form { margin-top: 4px; }
+.manual-grade-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+.manual-grade-grid label, .manual-attendance-grid label, .warning-form-grid label { display: flex; flex-direction: column; gap: 5px; }
+.manual-grade-grid label > span, .manual-attendance-grid label > span, .warning-form-grid label > span { color: var(--ink-muted); font-size: 10.5px; }
+.teacher-edit-form input, .teacher-edit-form textarea { width: 100%; border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 2px; padding: 8px 9px; font-family: inherit; font-size: 12px; }
+.teacher-edit-form input:focus, .teacher-edit-form textarea:focus { border-color: var(--gold); outline: none; box-shadow: 0 0 0 2px rgba(199,154,46,.12); }
+.compact-button { width: auto; padding: 8px 13px; font-size: 12px; }
+.save-feedback { color: var(--green); display: inline-block; font-size: 11px; margin-left: 9px; }
+.manual-attendance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.attendance-preview { margin-top: 16px; }
+.warning-form { border-top: 1px solid var(--line-soft); margin-top: 18px; padding-top: 18px; }
+.warning-form-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 11px; }
+.warning-form-title strong { font-family: var(--font-display); font-size: 15px; font-weight: 500; }
+.warning-form-grid { display: grid; grid-template-columns: 150px 1fr; gap: 9px; margin-bottom: 12px; }
+.warning-detail-field { grid-column: 1 / -1; }
+.warning-detail-field textarea { resize: vertical; min-height: 54px; }
+.warning-copy { flex: 1; }
+.warning-actions { display: flex; gap: 7px; align-items: center; }
+.warning-actions .text-button { font-size: 11px; }
+.warning-actions .delete-warning { color: var(--brick); }
+
+@media (max-width: 600px) {
+  .manual-grade-grid { grid-template-columns: repeat(2, 1fr); }
+  .warning-form-grid { grid-template-columns: 1fr; }
+  .warning-detail-field { grid-column: auto; }
+  .warning-actions { flex-direction: column; align-items: flex-end; }
+}
+
+
+/* ---------- Course attendance taking ---------- */
+.attendance-taking-panel { padding: 24px 26px; border-top: 3px solid var(--green); }
+.attendance-session-count { color: var(--ink-muted); font-size: 11.5px; white-space: nowrap; }
+.attendance-session-toolbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); padding: 14px 0; margin-bottom: 16px; }
+.attendance-session-toolbar label { display: flex; flex-direction: column; gap: 5px; }
+.attendance-session-toolbar label span { color: var(--ink-muted); font-size: 10.5px; }
+.attendance-session-toolbar input { border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 2px; padding: 8px 9px; font-family: inherit; font-size: 12px; }
+.attendance-session-toolbar input:focus { border-color: var(--gold); outline: none; }
+.attendance-legend { display: flex; align-items: center; gap: 6px; color: var(--ink-muted); font-size: 11px; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-left: 8px; }
+.status-dot:first-child { margin-left: 0; }
+.status-dot.presente { background: var(--green); }
+.status-dot.ausente { background: var(--brick); }
+.status-dot.justificado { background: var(--gold); }
+.attendance-taking-table { min-width: 780px; }
+.attendance-status-options { display: flex; gap: 6px; }
+.attendance-option { position: relative; }
+.attendance-option input { position: absolute; opacity: 0; pointer-events: none; }
+.attendance-option span { display: inline-block; border: 1px solid var(--line); background: #fff; color: var(--ink-muted); border-radius: 16px; padding: 6px 10px; font-size: 11px; cursor: pointer; transition: all .15s ease; }
+.attendance-option span:hover { border-color: var(--navy); color: var(--navy); }
+.attendance-option.presente input:checked + span { background: #E7F1EA; border-color: #B9D6C0; color: var(--green); }
+.attendance-option.ausente input:checked + span { background: #F8ECE9; border-color: #E8BDB4; color: var(--brick); }
+.attendance-option.justificado input:checked + span { background: var(--gold-soft); border-color: #D9BE71; color: #7A5D18; }
+.attendance-form-footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--line-soft); margin-top: 12px; padding-top: 14px; }
+
+@media (max-width: 700px) {
+  .attendance-session-toolbar { align-items: flex-start; flex-direction: column; }
+  .attendance-legend { flex-wrap: wrap; }
+  .attendance-form-footer { align-items: flex-end; flex-direction: column-reverse; }
+}

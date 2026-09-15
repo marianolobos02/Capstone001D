@@ -3,7 +3,7 @@
    Tres tipos de cuenta: Docente, Apoderado y Estudiante.
    ========================================================= */
 
-const DB_KEY = "cnh_db_v2";
+const DB_KEY = "cnh_db_v4";
 const SESSION_KEY = "cnh_session_v1";
 
 function seedDatabase() {
@@ -269,11 +269,12 @@ function seedDatabase() {
           horario: "Lun / Mié / Vie · 08:00",
           periodo: "Año escolar 2026",
           students: [
-            { username: "mrojas", nombre: "María Fernanda Rojas", promedio: 6.2, asistencia: 94, amonestaciones: 0, ultimaEvaluacion: "Prueba Unidad 3", estado: "Regular", warnings: [] },
-            { username: "pmartinez", nombre: "Pablo Martínez", promedio: 5.8, asistencia: 91, amonestaciones: 1, ultimaEvaluacion: "Prueba Unidad 3", estado: "En seguimiento", warnings: [{ fecha: "02 sep 2026", tipo: "Atraso", detalle: "Ingreso posterior al inicio de la clase." }] },
-            { username: "asoto", nombre: "Antonia Soto", promedio: 6.6, asistencia: 98, amonestaciones: 0, ultimaEvaluacion: "Prueba Unidad 3", estado: "Regular", warnings: [] },
-            { username: "dcastro", nombre: "Diego Castro", promedio: 4.9, asistencia: 86, amonestaciones: 2, ultimaEvaluacion: "Prueba Unidad 3", estado: "Prioridad de apoyo", warnings: [{ fecha: "05 sep 2026", tipo: "Rendimiento", detalle: "Resultado insuficiente en la última evaluación." }, { fecha: "29 ago 2026", tipo: "Inasistencia", detalle: "Inasistencia sin justificar." }] }
-          ]
+            { username: "mrojas", nombre: "María Fernanda Rojas", promedio: 6.2, asistencia: 94, amonestaciones: 0, ultimaEvaluacion: "Prueba 3", estado: "Regular", evaluaciones: { prueba1: 6.0, prueba2: 6.3, prueba3: 6.2, examen: 6.3 }, warnings: [] },
+            { username: "pmartinez", nombre: "Pablo Martínez", promedio: 5.8, asistencia: 91, amonestaciones: 1, ultimaEvaluacion: "Prueba 3", estado: "En seguimiento", evaluaciones: { prueba1: 5.5, prueba2: 5.9, prueba3: 6.0, examen: 5.8 }, warnings: [{ fecha: "02 sep 2026", tipo: "Atraso", detalle: "Ingreso posterior al inicio de la clase." }] },
+            { username: "asoto", nombre: "Antonia Soto", promedio: 6.6, asistencia: 98, amonestaciones: 0, ultimaEvaluacion: "Prueba 3", estado: "Regular", evaluaciones: { prueba1: 6.7, prueba2: 6.5, prueba3: 6.8, examen: 6.4 }, warnings: [] },
+            { username: "dcastro", nombre: "Diego Castro", promedio: 4.9, asistencia: 86, amonestaciones: 2, ultimaEvaluacion: "Prueba 3", estado: "Prioridad de apoyo", evaluaciones: { prueba1: 4.5, prueba2: 5.1, prueba3: 4.3, examen: 5.7 }, warnings: [{ fecha: "05 sep 2026", tipo: "Rendimiento", detalle: "Resultado insuficiente en la última evaluación." }, { fecha: "29 ago 2026", tipo: "Inasistencia", detalle: "Inasistencia sin justificar." }] }
+          ],
+          attendanceRecords: []
         },
         {
           id: "mat-3b",
@@ -283,11 +284,12 @@ function seedDatabase() {
           horario: "Lun / Mié / Vie · 08:00",
           periodo: "Año escolar 2026",
           students: [
-            { username: "jgomez", nombre: "Joaquín Gómez", promedio: 5.1, asistencia: 88, amonestaciones: 1, ultimaEvaluacion: "Prueba Unidad 3", estado: "En seguimiento", warnings: [{ fecha: "29 ago 2026", tipo: "Atrasos reiterados", detalle: "Tres atrasos registrados durante el mes." }] },
-            { username: "nfuentes", nombre: "Nicolás Fuentes", promedio: 6.0, asistencia: 95, amonestaciones: 0, ultimaEvaluacion: "Prueba Unidad 3", estado: "Regular", warnings: [] },
-            { username: "cvera", nombre: "Catalina Vera", promedio: 5.5, asistencia: 93, amonestaciones: 0, ultimaEvaluacion: "Prueba Unidad 3", estado: "Regular", warnings: [] },
-            { username: "fespinoza", nombre: "Felipe Espinoza", promedio: 4.2, asistencia: 82, amonestaciones: 2, ultimaEvaluacion: "Prueba Unidad 3", estado: "Prioridad de apoyo", warnings: [{ fecha: "08 sep 2026", tipo: "Rendimiento", detalle: "Dos evaluaciones bajo 4,0 durante el semestre." }, { fecha: "22 ago 2026", tipo: "Convivencia", detalle: "Situación derivada a orientación." }] }
-          ]
+            { username: "jgomez", nombre: "Joaquín Gómez", promedio: 5.1, asistencia: 88, amonestaciones: 1, ultimaEvaluacion: "Prueba 3", estado: "En seguimiento", evaluaciones: { prueba1: 5.0, prueba2: 5.2, prueba3: 4.8, examen: 5.4 }, warnings: [{ fecha: "29 ago 2026", tipo: "Atrasos reiterados", detalle: "Tres atrasos registrados durante el mes." }] },
+            { username: "nfuentes", nombre: "Nicolás Fuentes", promedio: 6.0, asistencia: 95, amonestaciones: 0, ultimaEvaluacion: "Prueba 3", estado: "Regular", evaluaciones: { prueba1: 6.2, prueba2: 5.8, prueba3: 6.1, examen: 5.9 }, warnings: [] },
+            { username: "cvera", nombre: "Catalina Vera", promedio: 5.5, asistencia: 93, amonestaciones: 0, ultimaEvaluacion: "Prueba 3", estado: "Regular", evaluaciones: { prueba1: 5.4, prueba2: 5.6, prueba3: 5.2, examen: 5.8 }, warnings: [] },
+            { username: "fespinoza", nombre: "Felipe Espinoza", promedio: 4.2, asistencia: 82, amonestaciones: 2, ultimaEvaluacion: "Prueba 3", estado: "Prioridad de apoyo", evaluaciones: { prueba1: 4.0, prueba2: 4.5, prueba3: 3.8, examen: 4.5 }, warnings: [{ fecha: "08 sep 2026", tipo: "Rendimiento", detalle: "Dos evaluaciones bajo 4,0 durante el semestre." }, { fecha: "22 ago 2026", tipo: "Convivencia", detalle: "Situación derivada a orientación." }] }
+          ],
+          attendanceRecords: []
         },
         {
           id: "mat-8a",
@@ -297,10 +299,11 @@ function seedDatabase() {
           horario: "Lun / Mié · 08:00",
           periodo: "Año escolar 2026",
           students: [
-            { username: "lgonzalez", nombre: "Lucía González", promedio: 6.0, asistencia: 97, amonestaciones: 0, ultimaEvaluacion: "Prueba de fracciones", estado: "Regular", warnings: [] },
-            { username: "mreyes", nombre: "Martina Reyes", promedio: 5.7, asistencia: 94, amonestaciones: 0, ultimaEvaluacion: "Prueba de fracciones", estado: "Regular", warnings: [] },
-            { username: "bnavarro", nombre: "Benjamín Navarro", promedio: 5.2, asistencia: 90, amonestaciones: 1, ultimaEvaluacion: "Prueba de fracciones", estado: "En seguimiento", warnings: [{ fecha: "03 sep 2026", tipo: "Materiales", detalle: "No presentó materiales de trabajo." }] }
-          ]
+            { username: "lgonzalez", nombre: "Lucía González", promedio: 6.0, asistencia: 97, amonestaciones: 0, ultimaEvaluacion: "Prueba 3", estado: "Regular", evaluaciones: { prueba1: 5.9, prueba2: 6.2, prueba3: 6.0, examen: 5.9 }, warnings: [] },
+            { username: "mreyes", nombre: "Martina Reyes", promedio: 5.7, asistencia: 94, amonestaciones: 0, ultimaEvaluacion: "Prueba 3", estado: "Regular", evaluaciones: { prueba1: 5.6, prueba2: 5.8, prueba3: 5.5, examen: 5.9 }, warnings: [] },
+            { username: "bnavarro", nombre: "Benjamín Navarro", promedio: 5.2, asistencia: 90, amonestaciones: 1, ultimaEvaluacion: "Prueba 3", estado: "En seguimiento", evaluaciones: { prueba1: 5.0, prueba2: 5.4, prueba3: 4.8, examen: 5.6 }, warnings: [{ fecha: "03 sep 2026", tipo: "Materiales", detalle: "No presentó materiales de trabajo." }] }
+          ],
+          attendanceRecords: []
         }
       ]
     },
@@ -321,6 +324,41 @@ function seedDatabase() {
         { dia: "18", mes: "SEP", titulo: "Reunión de apoderados — 4° Medio A", detalle: "Auditorio principal, 18:30 hrs." },
         { dia: "23", mes: "SEP", titulo: "Consejo de evaluación", detalle: "Sala de reuniones, 16:00 hrs." },
         { dia: "30", mes: "SEP", titulo: "Cierre de calificaciones del mes", detalle: "Ingresar notas y observaciones pendientes." }
+      ]
+    },
+
+    teacherMessages: {
+      asilva: [
+        {
+          id: "tm-001",
+          destinatario: "apoderado",
+          nombre: "Carolina Fuentes",
+          relacionado: "María Fernanda Rojas · 4° Medio A",
+          asunto: "Seguimiento de asistencia — María Fernanda",
+          fecha: "15 sep 2026",
+          leido: false,
+          cuerpo: "Estimada Carolina,\n\nQuería comentarte que María Fernanda mantiene un 94% de asistencia en Matemática y un buen desempeño general.\n\nSeguiremos reforzando los contenidos de la próxima evaluación.\n\nSaludos,\nProf. Andrea Silva"
+        },
+        {
+          id: "tm-002",
+          destinatario: "estudiante",
+          nombre: "Joaquín Gómez",
+          relacionado: "Matemática · 3° Medio B",
+          asunto: "Material de apoyo para Prueba 3",
+          fecha: "14 sep 2026",
+          leido: false,
+          cuerpo: "Hola Joaquín,\n\nTe dejo disponible el material de apoyo para preparar la Prueba 3. Revisa especialmente los ejercicios de funciones.\n\nSi necesitas una tutoría, escríbeme para coordinar un horario.\n\nProf. Andrea Silva"
+        },
+        {
+          id: "tm-003",
+          destinatario: "apoderado",
+          nombre: "Apoderados 4° Medio A",
+          relacionado: "Matemática · 4° Medio A",
+          asunto: "Reunión de apoderados — 18 de septiembre",
+          fecha: "12 sep 2026",
+          leido: true,
+          cuerpo: "Estimadas familias,\n\nLes recuerdo que la reunión de apoderados se realizará el viernes 18 de septiembre a las 18:30 hrs en el auditorio principal.\n\nSaludos cordiales,\nProf. Andrea Silva"
+        }
       ]
     },
 
@@ -462,6 +500,11 @@ function getTeacherEvents(username) {
   return db.teacherCalendar[username] || [];
 }
 
+function getTeacherMessages(username) {
+  const db = getDatabase();
+  return db.teacherMessages?.[username] || [];
+}
+
 function getMessages(username) {
   const db = getDatabase();
   return db.messages[username] || [];
@@ -493,6 +536,7 @@ window.Academy7Data = {
   getTeacherCourses,
   getTeacherSchedule,
   getTeacherEvents,
+  getTeacherMessages,
   getMessages,
   persistDatabase
 };

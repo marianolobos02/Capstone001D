@@ -32,7 +32,8 @@ const ROLE_CONFIG = {
       ["cursos", "Mis cursos"],
       ["horario", "Horario de clases"],
       ["calendario", "Calendario"],
-      ["amonestaciones", "Amonestaciones"]
+      ["amonestaciones", "Amonestaciones"],
+      ["mensajes", "Mensajes"]
     ]
   },
   apoderado: {
@@ -451,11 +452,141 @@ function renderTeacherCourses() {
   });
 }
 
+function getCourseAttendanceRecords(course) {
+  return Array.isArray(course.attendanceRecords) ? course.attendanceRecords : [];
+}
+
+function getStudentCourseAttendance(course, student) {
+  const records = getCourseAttendanceRecords(course)
+    .map((session) => session.records?.[student.username])
+    .filter(Boolean);
+  if (!records.length) return Number(student.asistencia || 0);
+  const attended = records.filter((status) => status === "presente" || status === "justificado").length;
+  return Math.round((attended / records.length) * 100);
+}
+
+function attendanceStatusLabel(status) {
+  return ({ presente: "Presente", ausente: "Ausente", justificado: "Justificado" })[status] || "Sin registrar";
+}
+
+function renderCourseAttendanceTaking(course) {
+  const records = getCourseAttendanceRecords(course);
+  const selectedDate = records[records.length - 1]?.fecha || new Date().toISOString().slice(0, 10);
+  const currentSession = records.find((session) => session.fecha === selectedDate);
+  return `
+    <div class="panel attendance-taking-panel section-panel-gap" id="courseAttendancePanel">
+      <div class="panel-heading"><div><span class="eyebrow">Registro de asistencia</span><h3>Tomar asistencia del curso</h3><p class="panel-caption">Selecciona una fecha y marca a cada estudiante como Presente, Ausente o Justificado.</p></div><span class="attendance-session-count">${records.length} clase(s) registradas</span></div>
+      <form id="courseAttendanceForm" class="course-attendance-form" novalidate>
+        <div class="attendance-session-toolbar"><label><span>Fecha de la clase</span><input type="date" name="fecha" value="${selectedDate}" required></label><div class="attendance-legend"><span class="status-dot presente"></span>Presente <span class="status-dot ausente"></span>Ausente <span class="status-dot justificado"></span>Justificado</div></div>
+        <div class="responsive-table"><table class="data-table attendance-taking-table"><thead><tr><th>Estudiante</th><th>Porcentaje en el curso</th><th>Estado de esta clase</th></tr></thead><tbody>${course.students.map((student) => { const status = currentSession?.records?.[student.username] || "presente"; return `<tr><td><div class="person-cell"><span class="avatar tiny">${escapeHTML(getInitials(student.nombre))}</span><div><strong>${escapeHTML(student.nombre)}</strong><small>${escapeHTML(student.username)}</small></div></div></td><td><div class="table-progress"><span>${getStudentCourseAttendance(course, student)}%</span><i><b style="width:${getStudentCourseAttendance(course, student)}%"></b></i></div></td><td><div class="attendance-status-options">${["presente", "ausente", "justificado"].map((option) => `<label class="attendance-option ${option} ${status === option ? "selected" : ""}"><input type="radio" name="status-${student.username}" value="${option}" ${status === option ? "checked" : ""} required><span>${attendanceStatusLabel(option)}</span></label>`).join("")}</div></td></tr>`; }).join("")}</tbody></table></div>
+        <div class="attendance-form-footer"><span class="save-feedback" id="attendanceSessionFeedback"></span><button type="submit" class="btn-primary compact-button">Guardar asistencia del día</button></div>
+      </form>
+    </div>
+  `;
+}
+
+function renderTeacherStudentDetail(course, student) {
+  const evaluations = student.evaluaciones || {};
+  const warnings = student.warnings || [];
+  const assessmentRows = [
+    ["Prueba 1", evaluations.prueba1],
+    ["Prueba 2", evaluations.prueba2],
+    ["Prueba 3", evaluations.prueba3],
+    ["Examen", evaluations.examen]
+  ];
+
+  return `
+    <div class="student-detail-header">
+      <div class="student-detail-person"><span class="avatar large">${escapeHTML(getInitials(student.nombre))}</span><div><span class="eyebrow">Detalle individual · ${escapeHTML(course.curso)}</span><h3>${escapeHTML(student.nombre)}</h3><p>${escapeHTML(course.nombre)} · ${escapeHTML(course.sala)}</p></div></div>
+      <button class="text-button" id="closeStudentDetail">Cerrar detalle ×</button>
+    </div>
+    <div class="student-detail-grid">
+      <div class="student-detail-section"><div class="detail-section-title"><h4>Notas del curso</h4><span class="grade-emphasis">Promedio ${Number(student.promedio).toFixed(1)}</span></div><form class="teacher-edit-form" id="gradesForm"><div class="manual-grade-grid">${assessmentRows.map(([label, value]) => `<label><span>${label}</span><input type="number" name="${label.toLowerCase().replace(" ", "")}" min="1" max="7" step="0.1" value="${value === undefined ? "" : Number(value).toFixed(1)}" required></label>`).join("")}</div><button type="submit" class="btn-primary compact-button">Guardar notas</button><span class="save-feedback" id="gradesFeedback"></span></form></div>
+      <div class="student-detail-section"><div class="detail-section-title"><h4>Asistencia en este curso</h4><strong class="detail-percent">${getStudentCourseAttendance(course, student)}%</strong></div><div class="attendance-preview">${renderProgress(getStudentCourseAttendance(course, student), `Clases asistidas en ${course.nombre}`)}</div><p class="detail-muted">Este porcentaje se calcula con las clases registradas como Presente o Justificado en este curso.</p></div>
+    </div>
+    <div class="student-detail-section warnings-section"><div class="detail-section-title"><h4>Amonestaciones</h4>${warnings.length ? renderPill(`${warnings.length} registro(s)`, "brick") : renderPill("Sin registros", "green")}</div><div class="student-warning-list">${warnings.map((warning, index) => `<div class="student-warning-item"><span class="warning-date">${escapeHTML(warning.fecha)}</span><div class="warning-copy"><strong>${escapeHTML(warning.tipo)}</strong><p>${escapeHTML(warning.detalle)}</p></div><div class="warning-actions"><button type="button" class="text-button edit-warning" data-warning-index="${index}">Editar</button><button type="button" class="text-button delete-warning" data-warning-index="${index}">Eliminar</button></div></div>`).join("") || `<p class="detail-muted">Este alumno no tiene amonestaciones registradas en el curso.</p>`}</div><form class="teacher-edit-form warning-form" id="warningForm"><div class="warning-form-title"><strong id="warningFormTitle">Nueva amonestación</strong><button type="button" class="text-button cancel-warning-edit" id="cancelWarningEdit" hidden>Cancelar edición</button></div><div class="warning-form-grid"><label><span>Fecha</span><input type="text" name="fecha" placeholder="ej: 15 sep 2026" required></label><label><span>Motivo / tipo</span><input type="text" name="tipo" placeholder="ej: Inasistencia" required></label><label class="warning-detail-field"><span>Detalle</span><textarea name="detalle" rows="2" placeholder="Describe el motivo de la amonestación" required></textarea></label></div><button type="submit" class="btn-primary compact-button" id="warningSubmitButton">Agregar amonestación</button><span class="save-feedback" id="warningFeedback"></span></form></div>
+  `;
+}
+
+function bindTeacherStudentDetailActions(course, student) {
+  const detail = document.getElementById("teacherStudentDetail");
+  if (!detail) return;
+
+  const refreshDetail = () => {
+    detail.innerHTML = renderTeacherStudentDetail(course, student);
+    bindTeacherStudentDetailActions(course, student);
+  };
+
+  document.getElementById("gradesForm")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const values = ["prueba1", "prueba2", "prueba3", "examen"].map((key) => Number(form.get(key)));
+    if (values.some((value) => Number.isNaN(value) || value < 1 || value > 7)) return;
+    student.evaluaciones = { prueba1: values[0], prueba2: values[1], prueba3: values[2], examen: values[3] };
+    student.promedio = Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1));
+    student.ultimaEvaluacion = "Examen";
+    persistDatabase(db);
+    refreshDetail();
+    document.getElementById("gradesFeedback")?.replaceChildren(document.createTextNode("Notas guardadas"));
+  });
+
+  let editingWarningIndex = null;
+  const warningForm = document.getElementById("warningForm");
+  const warningTitle = document.getElementById("warningFormTitle");
+  const warningSubmit = document.getElementById("warningSubmitButton");
+  const cancelWarningEdit = document.getElementById("cancelWarningEdit");
+
+  document.querySelectorAll(".edit-warning").forEach((button) => {
+    button.addEventListener("click", () => {
+      editingWarningIndex = Number(button.dataset.warningIndex);
+      const warning = student.warnings[editingWarningIndex];
+      warningForm.fecha.value = warning.fecha;
+      warningForm.tipo.value = warning.tipo;
+      warningForm.detalle.value = warning.detalle;
+      warningTitle.textContent = "Editar amonestación";
+      warningSubmit.textContent = "Guardar cambios";
+      cancelWarningEdit.hidden = false;
+      warningForm.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  });
+
+  document.querySelectorAll(".delete-warning").forEach((button) => {
+    button.addEventListener("click", () => {
+      const index = Number(button.dataset.warningIndex);
+      student.warnings.splice(index, 1);
+      student.amonestaciones = student.warnings.length;
+      persistDatabase(db);
+      refreshDetail();
+    });
+  });
+
+  cancelWarningEdit?.addEventListener("click", () => {
+    editingWarningIndex = null;
+    warningForm.reset();
+    warningTitle.textContent = "Nueva amonestación";
+    warningSubmit.textContent = "Agregar amonestación";
+    cancelWarningEdit.hidden = true;
+  });
+
+  warningForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const warning = { fecha: String(form.get("fecha")).trim(), tipo: String(form.get("tipo")).trim(), detalle: String(form.get("detalle")).trim() };
+    if (!warning.fecha || !warning.tipo || !warning.detalle) return;
+    if (!student.warnings) student.warnings = [];
+    if (editingWarningIndex === null) student.warnings.push(warning);
+    else student.warnings[editingWarningIndex] = warning;
+    student.amonestaciones = student.warnings.length;
+    persistDatabase(db);
+    refreshDetail();
+  });
+}
+
 function renderTeacherCourseDetail(courseId) {
   const course = getTeacherCourses(currentUser.username).find((item) => item.id === courseId);
   if (!course) return renderTeacherCourses();
   setGreeting(course.curso);
-  const averageAttendance = average(course.students.map((student) => student.asistencia));
+  const averageAttendance = average(course.students.map((student) => getStudentCourseAttendance(course, student)));
   const averageGrade = average(course.students.map((student) => student.promedio));
   const warningTotal = course.students.reduce((total, student) => total + student.amonestaciones, 0);
 
@@ -472,10 +603,10 @@ function renderTeacherCourseDetail(courseId) {
       <div class="panel-heading"><div><h3>Seguimiento de estudiantes</h3><p class="panel-caption">Lista completa con calificaciones, asistencia y situación formativa.</p></div><span class="table-note">Última actualización: hoy</span></div>
       <div class="responsive-table"><table class="data-table teacher-student-table"><thead><tr><th>Alumno</th><th>Promedio</th><th>Asistencia</th><th>Amonestaciones</th><th>Última evaluación</th><th>Estado</th></tr></thead><tbody>
         ${course.students.map((student) => `
-          <tr>
+          <tr class="student-select-row" data-student-username="${student.username}" tabindex="0" aria-label="Ver detalle de ${escapeHTML(student.nombre)}">
             <td><div class="person-cell"><span class="avatar tiny">${escapeHTML(getInitials(student.nombre))}</span><div><strong>${escapeHTML(student.nombre)}</strong><small>${escapeHTML(student.username)}</small></div></div></td>
             <td><strong class="grade-emphasis">${Number(student.promedio).toFixed(1)}</strong></td>
-            <td><div class="table-progress"><span>${student.asistencia}%</span><i><b style="width:${student.asistencia}%"></b></i></div></td>
+            <td><div class="table-progress"><span>${getStudentCourseAttendance(course, student)}%</span><i><b style="width:${getStudentCourseAttendance(course, student)}%"></b></i></div></td>
             <td>${student.amonestaciones ? renderPill(String(student.amonestaciones), "brick") : renderPill("0", "green")}</td>
             <td>${escapeHTML(student.ultimaEvaluacion)}</td>
             <td>${student.estado === "Regular" ? renderPill(student.estado, "green") : student.estado === "En seguimiento" ? renderPill(student.estado, "gold") : renderPill(student.estado, "brick")}</td>
@@ -484,8 +615,47 @@ function renderTeacherCourseDetail(courseId) {
         `).join("")}
       </tbody></table></div>
     </div>
+    ${renderCourseAttendanceTaking(course)}
+    <div class="panel student-detail-panel section-panel-gap" id="teacherStudentDetail"><div class="empty-state compact-empty"><div class="glyph">↓</div>Selecciona un alumno para ver sus notas, asistencia y amonestaciones.</div></div>
   `;
   document.getElementById("backToCourses").addEventListener("click", renderTeacherCourses);
+  const selectStudent = (row) => {
+    const student = course.students.find((item) => item.username === row.dataset.studentUsername);
+    if (!student) return;
+    const detail = document.getElementById("teacherStudentDetail");
+    detail.innerHTML = renderTeacherStudentDetail(course, student);
+    document.querySelectorAll(".student-select-row").forEach((item) => item.classList.toggle("selected", item === row));
+    bindTeacherStudentDetailActions(course, student);
+    document.getElementById("closeStudentDetail").addEventListener("click", () => {
+      detail.innerHTML = `<div class="empty-state compact-empty"><div class="glyph">↓</div>Selecciona un alumno para ver sus notas, asistencia y amonestaciones.</div>`;
+      row.classList.remove("selected");
+    });
+    detail.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  document.querySelectorAll(".student-select-row").forEach((row) => {
+    row.addEventListener("click", () => selectStudent(row));
+    row.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        selectStudent(row);
+      }
+    });
+  });
+  document.getElementById("courseAttendanceForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const fecha = String(form.get("fecha") || "");
+    if (!fecha) return;
+    const records = Object.fromEntries(course.students.map((student) => [student.username, String(form.get(`status-${student.username}`) || "presente")]));
+    if (Object.values(records).some((status) => !["presente", "ausente", "justificado"].includes(status))) return;
+    if (!Array.isArray(course.attendanceRecords)) course.attendanceRecords = [];
+    const existing = course.attendanceRecords.find((session) => session.fecha === fecha);
+    if (existing) existing.records = records;
+    else course.attendanceRecords.push({ fecha, records });
+    persistDatabase(db);
+    renderTeacherCourseDetail(course.id);
+    document.getElementById("courseAttendancePanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 }
 
 // ---------- Horarios y calendario ----------
@@ -601,7 +771,39 @@ function renderHijos() {
   });
 }
 
+function renderTeacherMessages(filter = "todos") {
+  setGreeting("Mensajes");
+  const messages = getTeacherMessages(currentUser.username);
+  const filteredMessages = filter === "todos" ? messages : messages.filter((message) => message.destinatario === filter);
+  const unread = messages.filter((message) => !message.leido).length;
+  content.innerHTML = `
+    ${renderSectionIntro("Comunicaciones docentes", "Mensajes", "Conversa y realiza seguimiento con apoderados y estudiantes de tus cursos.")}
+    <div class="message-toolbar"><div><strong>${messages.length}</strong> conversaciones · <span>${unread} sin leer</span></div><div class="message-filters"><button class="message-filter ${filter === "todos" ? "active" : ""}" data-filter="todos">Todos</button><button class="message-filter ${filter === "apoderado" ? "active" : ""}" data-filter="apoderado">Apoderados</button><button class="message-filter ${filter === "estudiante" ? "active" : ""}" data-filter="estudiante">Estudiantes</button></div></div>
+    <div class="msg-layout teacher-msg-layout">
+      <div class="msg-list" id="teacherMsgList">${filteredMessages.map((message) => `<button class="msg-item ${message.leido ? "" : "unread"}" data-message-id="${message.id}"><div class="from"><span>${escapeHTML(message.nombre)}</span>${!message.leido ? '<span class="dot-unread"></span>' : ""}</div><div class="preview">${escapeHTML(message.asunto)}</div><div class="message-related">${escapeHTML(message.relacionado)}</div></button>`).join("") || `<div class="empty-state"><div class="glyph">·</div>No hay mensajes para este filtro.</div>`}</div>
+      <div class="msg-detail" id="teacherMsgDetail"><div class="empty-state"><div class="glyph">·</div>Selecciona una conversación para leerla.</div></div>
+    </div>
+  `;
+  document.querySelectorAll(".message-filter").forEach((button) => {
+    button.addEventListener("click", () => renderTeacherMessages(button.dataset.filter));
+  });
+  document.querySelectorAll("#teacherMsgList .msg-item").forEach((button) => {
+    button.addEventListener("click", () => {
+      const message = messages.find((item) => item.id === button.dataset.messageId);
+      if (!message) return;
+      message.leido = true;
+      db.teacherMessages[currentUser.username] = messages;
+      persistDatabase(db);
+      document.querySelectorAll("#teacherMsgList .msg-item").forEach((item) => item.classList.remove("active"));
+      button.classList.add("active");
+      button.querySelector(".dot-unread")?.remove();
+      document.getElementById("teacherMsgDetail").innerHTML = `<div class="message-detail-top"><span class="message-recipient-pill ${message.destinatario}">${message.destinatario === "apoderado" ? "Apoderado" : "Estudiante"}</span><span class="meta">${escapeHTML(message.fecha)}</span></div><h3>${escapeHTML(message.asunto)}</h3><div class="message-recipient">Para: <strong>${escapeHTML(message.nombre)}</strong><span>${escapeHTML(message.relacionado)}</span></div><div class="body">${escapeHTML(message.cuerpo).replace(/\n/g, "<br>")}</div><button class="btn-outline message-reply">Responder a ${escapeHTML(message.nombre)} →</button>`;
+    });
+  });
+}
+
 function renderMensajes() {
+  if (roleKey === "docente") return renderTeacherMessages();
   setGreeting("Mensajes");
   const messages = getMessages(currentUser.username);
   content.innerHTML = `
