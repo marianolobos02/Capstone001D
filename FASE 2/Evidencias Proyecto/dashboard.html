@@ -19,14 +19,8 @@
       <div class="school-name">Academy7</div>
     </div>
 
-    <ul class="nav-list">
-      <li><button class="nav-link" data-section="inicio"><span class="dot"></span>Inicio</button></li>
-      <li><button class="nav-link" data-section="perfil"><span class="dot"></span>Perfil</button></li>
-      <li><button class="nav-link" data-section="cursos"><span class="dot"></span>Cursos</button></li>
-      <li><button class="nav-link" data-section="calendario"><span class="dot"></span>Calendario</button></li>
-      <li><button class="nav-link" data-section="notas"><span class="dot"></span>Notas / Calificaciones</button></li>
-      <li><button class="nav-link" data-section="mensajes"><span class="dot"></span>Mensajes</button></li>
-    </ul>
+    <div class="sidebar-role" id="sidebarRole"></div>
+    <ul class="nav-list" id="navList"></ul>
 
     <div class="sidebar-footer">
       <button class="logout-link" id="logoutBtn"><span class="dot"></span>Cerrar sesión</button>
@@ -41,12 +35,16 @@
         <div class="date" id="greetingDate"></div>
       </div>
       <div class="topbar-user">
+        <div class="user-summary">
+          <strong id="topUserName"></strong>
+          <span id="topUserRole"></span>
+        </div>
         <div class="avatar" id="topAvatar">--</div>
       </div>
     </header>
 
     <main class="content" id="content">
-      <!-- El contenido de cada sección se inyecta con JavaScript -->
+      <!-- El contenido de cada sección se inyecta con JavaScript. -->
     </main>
   </div>
 
