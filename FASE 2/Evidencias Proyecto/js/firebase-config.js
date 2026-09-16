@@ -1,6 +1,6 @@
 /* Academy7 Firebase / Firestore adapter.
-   The demo login remains local; teacher records use Firestore when available
-   and localStorage remains the fallback for offline or restricted setups. */
+   Firebase Authentication controls access; localStorage only keeps the
+   portal's role/session data available for the demo interface. */
 
 const firebaseConfig = {
   apiKey: "AIzaSyCPMkIFZ0mloz5lHUdUx5w4UaOYD6wta0w",
@@ -13,12 +13,14 @@ const firebaseConfig = {
 };
 
 let academy7Firestore = null;
+let academy7Auth = null;
 let academy7FirebaseError = null;
 
 try {
   if (window.firebase) {
     if (!window.firebase.apps.length) window.firebase.initializeApp(firebaseConfig);
     academy7Firestore = window.firebase.firestore();
+    academy7Auth = window.firebase.auth();
   } else {
     academy7FirebaseError = new Error("Firebase SDK no cargado");
   }
@@ -41,6 +43,20 @@ function studentDocument(teacherId, courseId, studentId) {
 
 function teacherMessagesCollection(teacherId) {
   return academy7Firestore.collection("teachers").doc(String(teacherId)).collection("messages");
+}
+
+function academyEmailForUsername(username) {
+  return `${String(username || "").trim().toLowerCase()}@academy7.cl`;
+}
+
+async function signInWithFirebase(username, password) {
+  if (!academy7Auth) throw academy7FirebaseError || new Error("Firebase Authentication no está disponible");
+  const credential = await academy7Auth.signInWithEmailAndPassword(academyEmailForUsername(username), String(password));
+  return credential.user;
+}
+
+async function signOutFromFirebase() {
+  if (academy7Auth) await academy7Auth.signOut();
 }
 
 async function loadCourseAttendanceFromFirebase(teacherId, courseId) {
@@ -102,6 +118,9 @@ async function saveTeacherMessageToFirebase(teacherId, message) {
 
 window.Academy7Firebase = {
   isAvailable: () => Boolean(academy7Firestore),
+  authAvailable: () => Boolean(academy7Auth),
+  signIn: signInWithFirebase,
+  signOut: signOutFromFirebase,
   loadCourseAttendance: loadCourseAttendanceFromFirebase,
   loadCourseStudents: loadCourseStudentsFromFirebase,
   saveCourseAttendance: saveCourseAttendanceToFirebase,
