@@ -473,6 +473,33 @@ async function hydrateCourseAttendance(course) {
   }
 }
 
+async function hydrateCourseStudents(course) {
+  if (!window.Academy7Firebase?.isAvailable?.() || !window.Academy7Firebase.loadCourseStudents) return;
+  try {
+    const remoteStudents = await window.Academy7Firebase.loadCourseStudents(currentUser.username, course.id);
+    let changed = false;
+    remoteStudents.forEach((remoteStudent) => {
+      const localStudent = course.students.find((student) => student.username === remoteStudent.username);
+      if (!localStudent) {
+        course.students.push(remoteStudent);
+        changed = true;
+        return;
+      }
+      const before = JSON.stringify(localStudent);
+      Object.assign(localStudent, remoteStudent);
+      delete localStudent.id;
+      if (JSON.stringify(localStudent) !== before) changed = true;
+    });
+    if (!changed) return;
+    persistDatabase(db);
+    if (document.getElementById("courseAttendancePanel") && !document.querySelector(".student-select-row.selected")) {
+      renderTeacherCourseDetail(course.id);
+    }
+  } catch (error) {
+    console.warn("Academy7: no se pudieron leer estudiantes desde Firestore; se conserva el respaldo local.", error);
+  }
+}
+
 function getStudentCourseAttendance(course, student) {
   const records = getCourseAttendanceRecords(course)
     .map((session) => session.records?.[student.username])
@@ -529,6 +556,16 @@ function bindTeacherStudentDetailActions(course, student) {
   const detail = document.getElementById("teacherStudentDetail");
   if (!detail) return;
 
+  const syncStudentRecord = (feedbackId) => {
+    if (!window.Academy7Firebase?.isAvailable?.()) return;
+    window.Academy7Firebase.saveStudentRecord(currentUser.username, course.id, student)
+      .then(() => document.getElementById(feedbackId)?.replaceChildren(document.createTextNode("Guardado en Firebase")))
+      .catch((error) => {
+        console.warn("Academy7: no se pudo guardar el registro del estudiante en Firestore; se mantuvo el registro local.", error);
+        document.getElementById(feedbackId)?.replaceChildren(document.createTextNode("Guardado local; Firebase requiere reglas o autenticación"));
+      });
+  };
+
   const refreshDetail = () => {
     detail.innerHTML = renderTeacherStudentDetail(course, student);
     bindTeacherStudentDetailActions(course, student);
@@ -545,6 +582,7 @@ function bindTeacherStudentDetailActions(course, student) {
     persistDatabase(db);
     refreshDetail();
     document.getElementById("gradesFeedback")?.replaceChildren(document.createTextNode("Notas guardadas"));
+    syncStudentRecord("gradesFeedback");
   });
 
   let editingWarningIndex = null;
@@ -574,6 +612,7 @@ function bindTeacherStudentDetailActions(course, student) {
       student.amonestaciones = student.warnings.length;
       persistDatabase(db);
       refreshDetail();
+      syncStudentRecord("warningFeedback");
     });
   });
 
@@ -596,6 +635,7 @@ function bindTeacherStudentDetailActions(course, student) {
     student.amonestaciones = student.warnings.length;
     persistDatabase(db);
     refreshDetail();
+    syncStudentRecord("warningFeedback");
   });
 }
 
@@ -684,6 +724,7 @@ function renderTeacherCourseDetail(courseId) {
     });
   });
   hydrateCourseAttendance(course);
+  hydrateCourseStudents(course);
 }
 
 // ---------- Horarios y calendario ----------

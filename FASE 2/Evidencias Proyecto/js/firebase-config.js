@@ -1,7 +1,6 @@
 /* Academy7 Firebase / Firestore adapter.
-   The login remains the current demo login; attendance writes use the
-   configured Firestore project and fall back to localStorage when Firestore
-   is unavailable or its security rules reject the request. */
+   The demo login remains local; teacher records use Firestore when available
+   and localStorage remains the fallback for offline or restricted setups. */
 
 const firebaseConfig = {
   apiKey: "AIzaSyCPMkIFZ0mloz5lHUdUx5w4UaOYD6wta0w",
@@ -28,16 +27,27 @@ try {
   console.warn("Academy7: Firebase no pudo inicializarse; se usará almacenamiento local.", error);
 }
 
+function courseCollection(teacherId) {
+  return academy7Firestore.collection("teachers").doc(String(teacherId)).collection("courses");
+}
+
 function attendanceCollection(teacherId, courseId) {
-  return academy7Firestore
-    .collection("teachers").doc(String(teacherId))
-    .collection("courses").doc(String(courseId))
-    .collection("attendance");
+  return courseCollection(teacherId).doc(String(courseId)).collection("attendance");
+}
+
+function studentDocument(teacherId, courseId, studentId) {
+  return courseCollection(teacherId).doc(String(courseId)).collection("students").doc(String(studentId));
 }
 
 async function loadCourseAttendanceFromFirebase(teacherId, courseId) {
   if (!academy7Firestore) return [];
   const snapshot = await attendanceCollection(teacherId, courseId).get();
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+}
+
+async function loadCourseStudentsFromFirebase(teacherId, courseId) {
+  if (!academy7Firestore) return [];
+  const snapshot = await courseCollection(teacherId).doc(String(courseId)).collection("students").get();
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 }
 
@@ -51,8 +61,28 @@ async function saveCourseAttendanceToFirebase(teacherId, courseId, fecha, record
   return { fecha, records };
 }
 
+async function saveStudentRecordToFirebase(teacherId, courseId, student) {
+  if (!academy7Firestore) throw academy7FirebaseError || new Error("Firestore no disponible");
+  const record = {
+    username: String(student.username),
+    nombre: String(student.nombre || ""),
+    promedio: Number(student.promedio || 0),
+    asistencia: Number(student.asistencia || 0),
+    amonestaciones: Number(student.amonestaciones || 0),
+    ultimaEvaluacion: String(student.ultimaEvaluacion || ""),
+    estado: String(student.estado || ""),
+    evaluaciones: student.evaluaciones || {},
+    warnings: Array.isArray(student.warnings) ? student.warnings : [],
+    updatedAt: window.firebase.firestore.FieldValue.serverTimestamp()
+  };
+  await studentDocument(teacherId, courseId, student.username).set(record, { merge: true });
+  return record;
+}
+
 window.Academy7Firebase = {
   isAvailable: () => Boolean(academy7Firestore),
   loadCourseAttendance: loadCourseAttendanceFromFirebase,
-  saveCourseAttendance: saveCourseAttendanceToFirebase
+  loadCourseStudents: loadCourseStudentsFromFirebase,
+  saveCourseAttendance: saveCourseAttendanceToFirebase,
+  saveStudentRecord: saveStudentRecordToFirebase
 };

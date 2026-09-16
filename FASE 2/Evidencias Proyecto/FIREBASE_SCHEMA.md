@@ -1,6 +1,6 @@
 # Estructura sugerida para Firebase / Firestore
 
-La demo actualmente guarda los cambios en `localStorage` mediante `persistDatabase(db)` para que pueda probarse sin credenciales. Esa función es el punto central que debe reemplazarse por operaciones de Firestore cuando se configure Firebase.
+La interfaz mantiene una copia local mediante `persistDatabase(db)` para permitir pruebas offline. Cuando Firebase está disponible, la asistencia, las notas y las amonestaciones del perfil Docente también se leen y escriben en Firestore.
 
 ## Cursos y estudiantes
 
@@ -64,4 +64,4 @@ teachers/{teacherId}/courses/{courseId}/students/{studentId}/warnings/{warningId
 
 Al guardar una nota, la interfaz recalcula `promedio` y actualiza el registro del estudiante. Al guardar asistencia, calcula el porcentaje usando `attended / total * 100`. Al agregar, editar o eliminar una amonestación, actualiza la colección de advertencias y el contador `amonestaciones` del estudiante.
 
-Para conectar Firebase, se recomienda conservar los formularios y reemplazar las llamadas a `persistDatabase(db)` por funciones como `saveStudentGrades`, `saveStudentAttendance`, `createWarning`, `updateWarning` y `deleteWarning`. La interfaz ya mantiene separados el docente, el curso y el alumno, por lo que esa migración puede hacerse sin cambiar la navegación.
+La integración activa utiliza `saveCourseAttendance` y `saveStudentRecord` desde `js/firebase-config.js`. Si Firestore rechaza una operación por reglas o autenticación, la interfaz conserva el cambio local y muestra un aviso. La siguiente etapa recomendada es activar Firebase Authentication y reemplazar las cuentas demo por usuarios autenticados.
