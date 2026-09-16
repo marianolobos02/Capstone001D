@@ -13,6 +13,7 @@ const db = getDatabase();
 const content = document.getElementById("content");
 const roleKey = getRoleKey(currentUser);
 let selectedChildUsername = null;
+const courseViewState = {};
 
 const MESES_LARGO = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -552,6 +553,30 @@ function renderCourseWarningsOverview(course) {
   return `<div class="panel section-panel-gap course-management-panel" id="courseWarningsPanel"><div class="panel-heading"><div><span class="eyebrow">Amonestaciones</span><h3>Seguimiento de amonestaciones</h3><p class="panel-caption">Selecciona un estudiante para agregar, editar o eliminar una amonestación.</p></div></div><div class="responsive-table"><table class="data-table"><thead><tr><th>Estudiante</th><th>Cantidad</th><th>Detalle</th><th></th></tr></thead><tbody>${course.students.map((student) => { const latest = student.warnings?.[0]; return `<tr><td><div class="person-cell"><span class="avatar tiny">${escapeHTML(getInitials(student.nombre))}</span><strong>${escapeHTML(student.nombre)}</strong></div></td><td>${student.amonestaciones ? renderPill(String(student.amonestaciones), "brick") : renderPill("0", "green")}</td><td>${latest ? `${escapeHTML(latest.fecha)} · ${escapeHTML(latest.tipo)}` : "Sin amonestaciones"}</td><td><button type="button" class="btn-outline warning-student-open" data-student-username="${escapeHTML(student.username)}">Gestionar</button></td></tr>`; }).join("")}</tbody></table></div></div>`;
 }
 
+function refreshCourseStudentRows(course, student) {
+  const findRow = (selector) => [...document.querySelectorAll(selector)].find((row) => row.dataset.studentUsername === student.username);
+  const studentRow = findRow(".student-select-row");
+  if (studentRow) {
+    const cells = studentRow.querySelectorAll("td");
+    if (cells[1]) cells[1].innerHTML = `<strong class="grade-emphasis">${formatGrade(student.promedio)}</strong>`;
+    if (cells[2]) cells[2].innerHTML = `<div class="table-progress"><span>${getStudentCourseAttendance(course, student)}%</span><i><b style="width:${getStudentCourseAttendance(course, student)}%"></b></i></div>`;
+  }
+  const gradesRow = findRow("#courseGradesPanel .course-student-open")?.closest("tr");
+  if (gradesRow) {
+    const grades = student.evaluaciones || {};
+    const cells = gradesRow.querySelectorAll("td");
+    [1, 2, 3].forEach((index) => { if (cells[index]) cells[index].textContent = formatGrade(grades[`prueba${index}`]); });
+    if (cells[4]) cells[4].innerHTML = `<strong class="grade-emphasis">${formatGrade(student.promedio)}</strong>`;
+  }
+  const warningsRow = findRow("#courseWarningsPanel .warning-student-open")?.closest("tr");
+  if (warningsRow) {
+    const latest = student.warnings?.[0];
+    const cells = warningsRow.querySelectorAll("td");
+    if (cells[1]) cells[1].innerHTML = student.amonestaciones ? renderPill(String(student.amonestaciones), "brick") : renderPill("0", "green");
+    if (cells[2]) cells[2].textContent = latest ? `${latest.fecha} · ${latest.tipo}` : "Sin amonestaciones";
+  }
+}
+
 function renderTeacherStudentDetail(course, student) {
   const evaluations = student.evaluaciones || {};
   const warnings = student.warnings || [];
@@ -610,6 +635,7 @@ function bindTeacherStudentDetailActions(course, student) {
     student.promedio = Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1));
     student.ultimaEvaluacion = labels[keys.filter((key) => nextEvaluations[key] !== undefined).at(-1)];
     persistDatabase(db);
+    refreshCourseStudentRows(course, student);
     refreshDetail();
     document.getElementById("gradesFeedback")?.replaceChildren(document.createTextNode("Notas guardadas"));
     syncStudentRecord("gradesFeedback");
@@ -641,6 +667,7 @@ function bindTeacherStudentDetailActions(course, student) {
       student.warnings.splice(index, 1);
       student.amonestaciones = student.warnings.length;
       persistDatabase(db);
+      refreshCourseStudentRows(course, student);
       refreshDetail();
       syncStudentRecord("warningFeedback");
     });
@@ -664,6 +691,7 @@ function bindTeacherStudentDetailActions(course, student) {
     else student.warnings[editingWarningIndex] = warning;
     student.amonestaciones = student.warnings.length;
     persistDatabase(db);
+    refreshCourseStudentRows(course, student);
     refreshDetail();
     syncStudentRecord("warningFeedback");
   });
@@ -694,17 +722,14 @@ function renderTeacherCourseDetail(courseId) {
     </div>
     <div class="panel section-panel-gap course-management-panel" id="courseStudentsPanel">
       <div class="panel-heading"><div><h3>Seguimiento de estudiantes</h3><p class="panel-caption">Lista completa con calificaciones, asistencia y situación formativa.</p></div><span class="table-note">Última actualización: hoy</span></div>
-      <div class="responsive-table"><table class="data-table teacher-student-table"><thead><tr><th>Alumno</th><th>Promedio</th><th>Asistencia</th><th>Amonestaciones</th><th>Última evaluación</th><th>Estado</th></tr></thead><tbody>
+      <div class="responsive-table"><table class="data-table teacher-student-table"><thead><tr><th>Estudiante</th><th>Promedio</th><th>Porcentaje de asistencia</th></tr></thead><tbody>
         ${course.students.map((student) => `
           <tr class="student-select-row" data-student-username="${student.username}" tabindex="0" aria-label="Ver detalle de ${escapeHTML(student.nombre)}">
             <td><div class="person-cell"><span class="avatar tiny">${escapeHTML(getInitials(student.nombre))}</span><div><strong>${escapeHTML(student.nombre)}</strong><small>${escapeHTML(student.username)}</small></div></div></td>
             <td><strong class="grade-emphasis">${formatGrade(student.promedio)}</strong></td>
             <td><div class="table-progress"><span>${getStudentCourseAttendance(course, student)}%</span><i><b style="width:${getStudentCourseAttendance(course, student)}%"></b></i></div></td>
-            <td>${student.amonestaciones ? renderPill(String(student.amonestaciones), "brick") : renderPill("0", "green")}</td>
-            <td>${escapeHTML(student.ultimaEvaluacion)}</td>
-            <td>${student.estado === "Regular" ? renderPill(student.estado, "green") : student.estado === "En seguimiento" ? renderPill(student.estado, "gold") : renderPill(student.estado, "brick")}</td>
+            
           </tr>
-          ${student.warnings?.length ? `<tr class="warning-detail-row"><td colspan="6"><span class="warning-label">Amonestaciones:</span> ${student.warnings.map((warning) => `${escapeHTML(warning.fecha)} · ${escapeHTML(warning.tipo)} — ${escapeHTML(warning.detalle)}`).join("  ·  ")}</td></tr>` : ""}
         `).join("")}
       </tbody></table></div>
     </div>
@@ -715,6 +740,7 @@ function renderTeacherCourseDetail(courseId) {
   `;
   document.getElementById("backToCourses").addEventListener("click", renderTeacherCourses);
   const showCourseView = (view) => {
+    courseViewState[course.id] = view;
     const panels = { students: "courseStudentsPanel", attendance: "courseAttendancePanel", grades: "courseGradesPanel", warnings: "courseWarningsPanel" };
     Object.entries(panels).forEach(([key, id]) => {
       const panel = document.getElementById(id);
@@ -723,7 +749,7 @@ function renderTeacherCourseDetail(courseId) {
     document.querySelectorAll(".course-tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.courseView === view));
   };
   document.querySelectorAll(".course-tab").forEach((tab) => tab.addEventListener("click", () => showCourseView(tab.dataset.courseView)));
-  showCourseView("students");
+  showCourseView(courseViewState[course.id] || "students");
 
   const selectStudent = (row) => {
     const student = course.students.find((item) => item.username === row.dataset.studentUsername);
