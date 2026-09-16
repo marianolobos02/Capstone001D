@@ -516,7 +516,10 @@ function getStudentCourseAttendance(course, student) {
   const records = getCourseAttendanceRecords(course)
     .map((session) => session.records?.[student.username])
     .filter(Boolean);
-  if (!records.length) return Number(student.asistencia || 0);
+  // La asistencia del curso depende exclusivamente de las clases registradas.
+  // Nunca se reutiliza el promedio agregado del estudiante, evitando que
+  // guardar una nota cambie accidentalmente el porcentaje de asistencia.
+  if (!records.length) return 0;
   const attended = records.filter((status) => status === "presente" || status === "justificado").length;
   return Math.round((attended / records.length) * 100);
 }
@@ -539,6 +542,14 @@ function renderCourseAttendanceTaking(course) {
       </form>
     </div>
   `;
+}
+
+function renderCourseGradesOverview(course) {
+  return `<div class="panel section-panel-gap course-management-panel" id="courseGradesPanel"><div class="panel-heading"><div><span class="eyebrow">Calificaciones</span><h3>Notas del curso</h3><p class="panel-caption">Selecciona un estudiante para modificar sus evaluaciones y revisar su promedio.</p></div></div><div class="responsive-table"><table class="data-table"><thead><tr><th>Estudiante</th><th>Evaluación 1</th><th>Evaluación 2</th><th>Evaluación 3</th><th>Promedio</th><th></th></tr></thead><tbody>${course.students.map((student) => { const grades = student.evaluaciones || {}; return `<tr><td><div class="person-cell"><span class="avatar tiny">${escapeHTML(getInitials(student.nombre))}</span><strong>${escapeHTML(student.nombre)}</strong></div></td><td>${formatGrade(grades.prueba1)}</td><td>${formatGrade(grades.prueba2)}</td><td>${formatGrade(grades.prueba3)}</td><td><strong class="grade-emphasis">${formatGrade(student.promedio)}</strong></td><td><button type="button" class="btn-outline course-student-open" data-student-username="${escapeHTML(student.username)}">Editar notas</button></td></tr>`; }).join("")}</tbody></table></div></div>`;
+}
+
+function renderCourseWarningsOverview(course) {
+  return `<div class="panel section-panel-gap course-management-panel" id="courseWarningsPanel"><div class="panel-heading"><div><span class="eyebrow">Amonestaciones</span><h3>Seguimiento de amonestaciones</h3><p class="panel-caption">Selecciona un estudiante para agregar, editar o eliminar una amonestación.</p></div></div><div class="responsive-table"><table class="data-table"><thead><tr><th>Estudiante</th><th>Cantidad</th><th>Detalle</th><th></th></tr></thead><tbody>${course.students.map((student) => { const latest = student.warnings?.[0]; return `<tr><td><div class="person-cell"><span class="avatar tiny">${escapeHTML(getInitials(student.nombre))}</span><strong>${escapeHTML(student.nombre)}</strong></div></td><td>${student.amonestaciones ? renderPill(String(student.amonestaciones), "brick") : renderPill("0", "green")}</td><td>${latest ? `${escapeHTML(latest.fecha)} · ${escapeHTML(latest.tipo)}` : "Sin amonestaciones"}</td><td><button type="button" class="btn-outline warning-student-open" data-student-username="${escapeHTML(student.username)}">Gestionar</button></td></tr>`; }).join("")}</tbody></table></div></div>`;
 }
 
 function renderTeacherStudentDetail(course, student) {
@@ -675,7 +686,13 @@ function renderTeacherCourseDetail(courseId) {
       ${renderMiniStat(`${averageAttendance}%`, "Asistencia promedio", "green")}
       ${renderMiniStat(warningTotal, "Amonestaciones", warningTotal ? "brick" : "green")}
     </div>
-    <div class="panel section-panel-gap">
+    <div class="course-management-tabs" role="tablist" aria-label="Gestión del curso">
+      <button type="button" class="course-tab active" data-course-view="students">Lista de estudiantes</button>
+      <button type="button" class="course-tab" data-course-view="attendance">Lista de asistencia</button>
+      <button type="button" class="course-tab" data-course-view="grades">Calificaciones</button>
+      <button type="button" class="course-tab" data-course-view="warnings">Amonestaciones</button>
+    </div>
+    <div class="panel section-panel-gap course-management-panel" id="courseStudentsPanel">
       <div class="panel-heading"><div><h3>Seguimiento de estudiantes</h3><p class="panel-caption">Lista completa con calificaciones, asistencia y situación formativa.</p></div><span class="table-note">Última actualización: hoy</span></div>
       <div class="responsive-table"><table class="data-table teacher-student-table"><thead><tr><th>Alumno</th><th>Promedio</th><th>Asistencia</th><th>Amonestaciones</th><th>Última evaluación</th><th>Estado</th></tr></thead><tbody>
         ${course.students.map((student) => `
@@ -692,9 +709,22 @@ function renderTeacherCourseDetail(courseId) {
       </tbody></table></div>
     </div>
     ${renderCourseAttendanceTaking(course)}
+    ${renderCourseGradesOverview(course)}
+    ${renderCourseWarningsOverview(course)}
     <div class="panel student-detail-panel section-panel-gap" id="teacherStudentDetail"><div class="empty-state compact-empty"><div class="glyph">↓</div>Selecciona un alumno para ver sus notas, asistencia y amonestaciones.</div></div>
   `;
   document.getElementById("backToCourses").addEventListener("click", renderTeacherCourses);
+  const showCourseView = (view) => {
+    const panels = { students: "courseStudentsPanel", attendance: "courseAttendancePanel", grades: "courseGradesPanel", warnings: "courseWarningsPanel" };
+    Object.entries(panels).forEach(([key, id]) => {
+      const panel = document.getElementById(id);
+      if (panel) panel.hidden = key !== view;
+    });
+    document.querySelectorAll(".course-tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.courseView === view));
+  };
+  document.querySelectorAll(".course-tab").forEach((tab) => tab.addEventListener("click", () => showCourseView(tab.dataset.courseView)));
+  showCourseView("students");
+
   const selectStudent = (row) => {
     const student = course.students.find((item) => item.username === row.dataset.studentUsername);
     if (!student) return;
@@ -713,6 +743,17 @@ function renderTeacherCourseDetail(courseId) {
     row.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
+        selectStudent(row);
+      }
+    });
+  });
+  document.querySelectorAll(".course-student-open, .warning-student-open").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const student = course.students.find((item) => item.username === button.dataset.studentUsername);
+      const row = document.querySelector(`.student-select-row[data-student-username="${CSS.escape(button.dataset.studentUsername)}"]`);
+      if (student && row) {
+        showCourseView("students");
         selectStudent(row);
       }
     });
@@ -759,6 +800,12 @@ function renderTeacherCourseDetail(courseId) {
   });
   document.querySelector("#courseAttendanceForm input[name='fecha']")?.addEventListener("change", (event) => {
     if (event.currentTarget.value) renderTeacherCourseDetail(course.id);
+  });
+  document.querySelectorAll(".attendance-option input").forEach((input) => {
+    input.addEventListener("change", () => {
+      const group = input.closest(".attendance-status-options");
+      group?.querySelectorAll(".attendance-option").forEach((option) => option.classList.toggle("selected", option.querySelector("input") === input));
+    });
   });
   hydrateCourseAttendance(course);
   hydrateCourseStudents(course);
