@@ -1087,3 +1087,49 @@ button {
   .attendance-legend { flex-wrap: wrap; }
   .attendance-form-footer { align-items: flex-end; flex-direction: column-reverse; }
 }
+
+
+/* ---------- Course management tabs and selection feedback ---------- */
+.course-management-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 22px;
+  border-bottom: 1px solid var(--line-soft);
+  padding-bottom: 10px;
+}
+.course-tab {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink-muted);
+  border-radius: 3px;
+  padding: 10px 14px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.course-tab:hover,
+.course-tab.active {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #fff;
+}
+.course-management-panel[hidden] { display: none !important; }
+.course-management-panel .btn-outline { cursor: pointer; }
+.course-student-open,
+.warning-student-open { white-space: nowrap; }
+.student-select-row { cursor: pointer; user-select: none; }
+.student-select-row:hover,
+.student-select-row:focus,
+.student-select-row.selected { background: #FBF1D3 !important; outline: none; }
+.student-select-row.selected td:first-child { box-shadow: inset 4px 0 0 var(--gold); }
+.attendance-option { cursor: pointer; }
+.attendance-option.selected span,
+.attendance-option input:checked + span {
+  font-weight: 700;
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 2px rgba(36, 55, 91, .12);
+}
+@media (max-width: 700px) {
+  .course-management-tabs { overflow-x: auto; flex-wrap: nowrap; }
+  .course-tab { white-space: nowrap; }
+}
