@@ -3,7 +3,7 @@
    Tres tipos de cuenta: Docente, Apoderado y Estudiante.
    ========================================================= */
 
-const DB_KEY = "cnh_db_v4";
+const DB_KEY = "cnh_db_v5";
 const SESSION_KEY = "cnh_session_v1";
 
 function seedDatabase() {
@@ -366,6 +366,22 @@ function seedDatabase() {
       cfuentes: ["mrojas", "lgonzalez"]
     }
   };
+
+  // La demo comienza sin notas ni amonestaciones para que el docente las
+  // registre manualmente. Los cambios posteriores se mantienen localmente
+  // y, cuando Firebase está disponible, también en Firestore.
+  Object.values(db.teacherCourses).flat().forEach((course) => {
+    course.students.forEach((student) => {
+      student.promedio = null;
+      student.asistencia = 0;
+      student.amonestaciones = 0;
+      student.ultimaEvaluacion = "";
+      student.estado = "Pendiente";
+      student.evaluaciones = {};
+      student.warnings = [];
+    });
+    course.attendanceRecords = [];
+  });
 
   localStorage.setItem(DB_KEY, JSON.stringify(db));
   return db;

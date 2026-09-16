@@ -80,8 +80,20 @@ function fullNameFirst(name) {
 }
 
 function average(values) {
-  const numeric = values.map(Number).filter((value) => !Number.isNaN(value));
+  const numeric = values.filter((value) => value !== null && value !== undefined && value !== "").map(Number).filter((value) => !Number.isNaN(value));
   return numeric.length ? (numeric.reduce((sum, value) => sum + value, 0) / numeric.length).toFixed(1) : "—";
+}
+
+function formatGrade(value) {
+  return value === null || value === undefined || value === "" ? "—" : Number(value).toFixed(1);
+}
+
+function formatAttendanceDate(isoDate) {
+  if (!isoDate) return "";
+  const date = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return isoDate;
+  const label = `${DIAS[date.getDay()]} ${date.getDate()} de ${MESES_LARGO[date.getMonth()]} de ${date.getFullYear()}`;
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 function getGuardianChild() {
@@ -519,7 +531,7 @@ function renderCourseAttendanceTaking(course) {
   const currentSession = records.find((session) => session.fecha === selectedDate);
   return `
     <div class="panel attendance-taking-panel section-panel-gap" id="courseAttendancePanel">
-      <div class="panel-heading"><div><span class="eyebrow">Registro de asistencia</span><h3>Tomar asistencia del curso</h3><p class="panel-caption">Selecciona una fecha y marca a cada estudiante como Presente, Ausente o Justificado.</p></div><span class="attendance-session-count">${records.length} clase(s) registradas</span></div>
+      <div class="panel-heading"><div><span class="eyebrow">Registro de asistencia</span><h3>Lista del día: ${escapeHTML(formatAttendanceDate(selectedDate))}</h3><p class="panel-caption">Selecciona una fecha y marca a cada estudiante como Presente, Ausente o Justificado.</p></div><span class="attendance-session-count">${records.length} clase(s) registradas</span></div>
       <form id="courseAttendanceForm" class="course-attendance-form" novalidate>
         <div class="attendance-session-toolbar"><label><span>Fecha de la clase</span><input type="date" name="fecha" value="${selectedDate}" required></label><div class="attendance-legend"><span class="status-dot presente"></span>Presente <span class="status-dot ausente"></span>Ausente <span class="status-dot justificado"></span>Justificado</div></div>
         <div class="responsive-table"><table class="data-table attendance-taking-table"><thead><tr><th>Estudiante</th><th>Porcentaje en el curso</th><th>Estado de esta clase</th></tr></thead><tbody>${course.students.map((student) => { const status = currentSession?.records?.[student.username] || "presente"; return `<tr><td><div class="person-cell"><span class="avatar tiny">${escapeHTML(getInitials(student.nombre))}</span><div><strong>${escapeHTML(student.nombre)}</strong><small>${escapeHTML(student.username)}</small></div></div></td><td><div class="table-progress"><span>${getStudentCourseAttendance(course, student)}%</span><i><b style="width:${getStudentCourseAttendance(course, student)}%"></b></i></div></td><td><div class="attendance-status-options">${["presente", "ausente", "justificado"].map((option) => `<label class="attendance-option ${option} ${status === option ? "selected" : ""}"><input type="radio" name="status-${student.username}" value="${option}" ${status === option ? "checked" : ""} required><span>${attendanceStatusLabel(option)}</span></label>`).join("")}</div></td></tr>`; }).join("")}</tbody></table></div>
@@ -545,7 +557,7 @@ function renderTeacherStudentDetail(course, student) {
       <button class="text-button" id="closeStudentDetail">Cerrar detalle ×</button>
     </div>
     <div class="student-detail-grid">
-      <div class="student-detail-section"><div class="detail-section-title"><h4>Notas del curso</h4><span class="grade-emphasis">Promedio ${Number(student.promedio).toFixed(1)}</span></div><form class="teacher-edit-form" id="gradesForm"><div class="manual-grade-grid">${assessmentRows.map(([label, value]) => `<label><span>${label}</span><input type="number" name="${label.toLowerCase().replace(" ", "")}" min="1" max="7" step="0.1" value="${value === undefined ? "" : Number(value).toFixed(1)}" required></label>`).join("")}</div><button type="submit" class="btn-primary compact-button">Guardar notas</button><span class="save-feedback" id="gradesFeedback"></span></form></div>
+      <div class="student-detail-section"><div class="detail-section-title"><h4>Notas del curso</h4><span class="grade-emphasis">Promedio ${student.promedio === null || student.promedio === undefined ? "—" : Number(student.promedio).toFixed(1)}</span></div><form class="teacher-edit-form" id="gradesForm"><div class="manual-grade-grid">${assessmentRows.map(([label, value]) => `<label><span>${label}</span><input type="number" name="${label.toLowerCase().replace(" ", "")}" min="1" max="7" step="0.1" value="${value === null || value === undefined ? "" : Number(value).toFixed(1)}"></label>`).join("")}</div><button type="submit" class="btn-primary compact-button">Guardar notas</button><span class="save-feedback" id="gradesFeedback"></span></form></div>
       <div class="student-detail-section"><div class="detail-section-title"><h4>Asistencia en este curso</h4><strong class="detail-percent">${getStudentCourseAttendance(course, student)}%</strong></div><div class="attendance-preview">${renderProgress(getStudentCourseAttendance(course, student), `Clases asistidas en ${course.nombre}`)}</div><p class="detail-muted">Este porcentaje se calcula con las clases registradas como Presente o Justificado en este curso.</p></div>
     </div>
     <div class="student-detail-section warnings-section"><div class="detail-section-title"><h4>Amonestaciones</h4>${warnings.length ? renderPill(`${warnings.length} registro(s)`, "brick") : renderPill("Sin registros", "green")}</div><div class="student-warning-list">${warnings.map((warning, index) => `<div class="student-warning-item"><span class="warning-date">${escapeHTML(warning.fecha)}</span><div class="warning-copy"><strong>${escapeHTML(warning.tipo)}</strong><p>${escapeHTML(warning.detalle)}</p></div><div class="warning-actions"><button type="button" class="text-button edit-warning" data-warning-index="${index}">Editar</button><button type="button" class="text-button delete-warning" data-warning-index="${index}">Eliminar</button></div></div>`).join("") || `<p class="detail-muted">Este alumno no tiene amonestaciones registradas en el curso.</p>`}</div><form class="teacher-edit-form warning-form" id="warningForm"><div class="warning-form-title"><strong id="warningFormTitle">Nueva amonestación</strong><button type="button" class="text-button cancel-warning-edit" id="cancelWarningEdit" hidden>Cancelar edición</button></div><div class="warning-form-grid"><label><span>Fecha</span><input type="text" name="fecha" placeholder="ej: 15 sep 2026" required></label><label><span>Motivo / tipo</span><input type="text" name="tipo" placeholder="ej: Inasistencia" required></label><label class="warning-detail-field"><span>Detalle</span><textarea name="detalle" rows="2" placeholder="Describe el motivo de la amonestación" required></textarea></label></div><button type="submit" class="btn-primary compact-button" id="warningSubmitButton">Agregar amonestación</button><span class="save-feedback" id="warningFeedback"></span></form></div>
@@ -574,11 +586,18 @@ function bindTeacherStudentDetailActions(course, student) {
   document.getElementById("gradesForm")?.addEventListener("submit", (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const values = ["prueba1", "prueba2", "prueba3", "examen"].map((key) => Number(form.get(key)));
-    if (values.some((value) => Number.isNaN(value) || value < 1 || value > 7)) return;
-    student.evaluaciones = { prueba1: values[0], prueba2: values[1], prueba3: values[2], examen: values[3] };
+    const keys = ["prueba1", "prueba2", "prueba3", "examen"];
+    const labels = { prueba1: "Prueba 1", prueba2: "Prueba 2", prueba3: "Prueba 3", examen: "Examen" };
+    const nextEvaluations = {};
+    keys.forEach((key) => {
+      const raw = String(form.get(key) || "").trim();
+      if (raw !== "") nextEvaluations[key] = Number(raw);
+    });
+    const values = Object.values(nextEvaluations);
+    if (!values.length || values.some((value) => Number.isNaN(value) || value < 1 || value > 7)) return;
+    student.evaluaciones = nextEvaluations;
     student.promedio = Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1));
-    student.ultimaEvaluacion = "Examen";
+    student.ultimaEvaluacion = labels[keys.filter((key) => nextEvaluations[key] !== undefined).at(-1)];
     persistDatabase(db);
     refreshDetail();
     document.getElementById("gradesFeedback")?.replaceChildren(document.createTextNode("Notas guardadas"));
@@ -662,7 +681,7 @@ function renderTeacherCourseDetail(courseId) {
         ${course.students.map((student) => `
           <tr class="student-select-row" data-student-username="${student.username}" tabindex="0" aria-label="Ver detalle de ${escapeHTML(student.nombre)}">
             <td><div class="person-cell"><span class="avatar tiny">${escapeHTML(getInitials(student.nombre))}</span><div><strong>${escapeHTML(student.nombre)}</strong><small>${escapeHTML(student.username)}</small></div></div></td>
-            <td><strong class="grade-emphasis">${Number(student.promedio).toFixed(1)}</strong></td>
+            <td><strong class="grade-emphasis">${formatGrade(student.promedio)}</strong></td>
             <td><div class="table-progress"><span>${getStudentCourseAttendance(course, student)}%</span><i><b style="width:${getStudentCourseAttendance(course, student)}%"></b></i></div></td>
             <td>${student.amonestaciones ? renderPill(String(student.amonestaciones), "brick") : renderPill("0", "green")}</td>
             <td>${escapeHTML(student.ultimaEvaluacion)}</td>
@@ -703,18 +722,33 @@ function renderTeacherCourseDetail(courseId) {
     const form = new FormData(event.currentTarget);
     const fecha = String(form.get("fecha") || "");
     if (!fecha) return;
+    const weekday = new Date(`${fecha}T00:00:00`).getDay();
+    if (weekday === 0 || weekday === 6) {
+      document.getElementById("attendanceSessionFeedback")?.replaceChildren(document.createTextNode("Selecciona un día de lunes a viernes"));
+      return;
+    }
     const records = Object.fromEntries(course.students.map((student) => [student.username, String(form.get(`status-${student.username}`) || "presente")]));
     if (Object.values(records).some((status) => !["presente", "ausente", "justificado"].includes(status))) return;
     if (!Array.isArray(course.attendanceRecords)) course.attendanceRecords = [];
     const existing = course.attendanceRecords.find((session) => session.fecha === fecha);
     if (existing) existing.records = records;
     else course.attendanceRecords.push({ fecha, records });
+    course.students.forEach((student) => {
+      student.asistencia = getStudentCourseAttendance(course, student);
+    });
     persistDatabase(db);
     const feedback = document.getElementById("attendanceSessionFeedback");
     const saveRemote = window.Academy7Firebase?.isAvailable?.()
       ? window.Academy7Firebase.saveCourseAttendance(currentUser.username, course.id, fecha, records)
       : Promise.reject(new Error("Firestore no disponible"));
     saveRemote.then(() => {
+      if (window.Academy7Firebase?.isAvailable?.()) {
+        course.students.forEach((student) => {
+          window.Academy7Firebase.saveStudentRecord(currentUser.username, course.id, student).catch((error) => {
+            console.warn("Academy7: no se pudo sincronizar el porcentaje del estudiante.", error);
+          });
+        });
+      }
       renderTeacherCourseDetail(course.id, false);
       document.getElementById("attendanceSessionFeedback")?.replaceChildren(document.createTextNode("Guardado en Firebase"));
     }).catch((error) => {
@@ -722,6 +756,9 @@ function renderTeacherCourseDetail(courseId) {
       renderTeacherCourseDetail(course.id, false);
       document.getElementById("attendanceSessionFeedback")?.replaceChildren(document.createTextNode("Guardado local; Firebase requiere reglas o autenticación"));
     });
+  });
+  document.querySelector("#courseAttendanceForm input[name='fecha']")?.addEventListener("change", (event) => {
+    if (event.currentTarget.value) renderTeacherCourseDetail(course.id);
   });
   hydrateCourseAttendance(course);
   hydrateCourseStudents(course);
