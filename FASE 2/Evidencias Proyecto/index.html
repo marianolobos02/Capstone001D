@@ -73,14 +73,16 @@
 
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
 <script src="js/firebase-config.js"></script>
 <script src="js/data.js"></script>
 <script>
-  // El login de las cuentas demo no depende de Firebase: Firebase se usa
-  // solamente para guardar la asistencia después de entrar al panel.
   const sessionValue = typeof getSession === "function" ? getSession() : localStorage.getItem("academy7_session");
-  if (sessionValue) {
-    window.location.replace("dashboard.html");
+  if (sessionValue && window.Academy7Firebase?.authAvailable?.() && window.firebase?.auth) {
+    window.firebase.auth().onAuthStateChanged((firebaseUser) => {
+      if (firebaseUser) window.location.replace("dashboard.html");
+      else if (typeof clearSession === "function") clearSession();
+    });
   }
 
   const form = document.getElementById("loginForm");
@@ -97,19 +99,21 @@
     });
   });
 
-  form.addEventListener("submit", function (e) {
+  form.addEventListener("submit", async function (e) {
     e.preventDefault();
-    const username = usernameInput.value;
+    const username = usernameInput.value.trim();
     const password = passwordInput.value;
-    const user = typeof findUser === "function"
-      ? findUser(username, password)
-      : (window.ACADEMY7_DEMO_ACCOUNTS || []).find((account) => account.username === username.trim() && account.password === password);
-
-    if (user) {
+    errorBox.textContent = "";
+    try {
+      await window.Academy7Firebase.signIn(username, password);
+      const user = typeof getUserByUsername === "function" ? getUserByUsername(username) : null;
+      if (!user) throw new Error("La cuenta autenticada no está registrada en el portal");
       if (typeof setSession === "function") setSession(user.username);
       else localStorage.setItem("academy7_session", user.username);
       window.location.replace("dashboard.html");
-    } else {
+    } catch (error) {
+      console.warn("Academy7: no se pudo iniciar sesión con Firebase Authentication.", error);
+      errorBox.textContent = "Usuario o contraseña incorrectos, o la cuenta aún no está creada en Firebase Authentication.";
       errorBox.classList.add("show");
     }
   });
