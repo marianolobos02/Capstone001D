@@ -476,11 +476,8 @@ async function hydrateCourseAttendance(course) {
     if (!remoteRecords.length) return;
     course.attendanceRecords = remoteRecords;
     persistDatabase(db);
-    // No reemplazar toda la vista si el docente ya seleccionó un alumno;
-    // el render asíncrono de Firebase no debe borrar su detalle abierto.
-    if (document.getElementById("courseAttendancePanel") && !document.querySelector(".student-select-row.selected")) {
-      renderTeacherCourseDetail(course.id);
-    }
+    // No reemplazar el DOM durante la hidratación: hacerlo podía borrar la
+    // pestaña o el estudiante que el docente acababa de seleccionar.
   } catch (error) {
     console.warn("Academy7: no se pudo leer asistencia desde Firestore; se conserva el respaldo local.", error);
   }
@@ -505,9 +502,8 @@ async function hydrateCourseStudents(course) {
     });
     if (!changed) return;
     persistDatabase(db);
-    if (document.getElementById("courseAttendancePanel") && !document.querySelector(".student-select-row.selected")) {
-      renderTeacherCourseDetail(course.id);
-    }
+    // No reemplazar el DOM durante la hidratación: las pestañas deben seguir
+    // siendo interactivas mientras llegan los datos remotos.
   } catch (error) {
     console.warn("Academy7: no se pudieron leer estudiantes desde Firestore; se conserva el respaldo local.", error);
   }
@@ -749,6 +745,13 @@ function renderTeacherCourseDetail(courseId) {
     document.querySelectorAll(".course-tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.courseView === view));
   };
   document.querySelectorAll(".course-tab").forEach((tab) => tab.addEventListener("click", () => showCourseView(tab.dataset.courseView)));
+  content.onclick = (event) => {
+    const tab = event.target.closest(".course-tab");
+    if (!tab || !content.contains(tab)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    showCourseView(tab.dataset.courseView);
+  };
   showCourseView(courseViewState[course.id] || "students");
 
   const selectStudent = (row) => {
