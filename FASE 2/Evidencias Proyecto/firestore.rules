@@ -1,0 +1,17 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Requiere Firebase Authentication. En producción conviene agregar
+    // claims de rol y verificar que el docente sea dueño del curso.
+    match /teachers/{teacherId}/courses/{courseId}/{document=**} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == teacherId;
+    }
+
+    // Denegar todo lo demás por defecto.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
