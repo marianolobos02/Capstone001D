@@ -14,6 +14,7 @@ const content = document.getElementById("content");
 const roleKey = getRoleKey(currentUser);
 let selectedChildUsername = null;
 const courseViewState = {};
+let teacherMessagesHydrated = false;
 
 const MESES_LARGO = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -534,7 +535,7 @@ function renderCourseAttendanceTaking(course) {
       <div class="panel-heading"><div><span class="eyebrow">Registro de asistencia</span><h3>Lista del día: ${escapeHTML(formatAttendanceDate(selectedDate))}</h3><p class="panel-caption">Selecciona una fecha y marca a cada estudiante como Presente, Ausente o Justificado.</p></div><span class="attendance-session-count">${records.length} clase(s) registradas</span></div>
       <form id="courseAttendanceForm" class="course-attendance-form" novalidate>
         <div class="attendance-session-toolbar"><label><span>Fecha de la clase</span><input type="date" name="fecha" value="${selectedDate}" required></label><div class="attendance-legend"><span class="status-dot presente"></span>Presente <span class="status-dot ausente"></span>Ausente <span class="status-dot justificado"></span>Justificado</div></div>
-        <div class="responsive-table"><table class="data-table attendance-taking-table"><thead><tr><th>Estudiante</th><th>Porcentaje en el curso</th><th>Estado de esta clase</th></tr></thead><tbody>${course.students.map((student) => { const status = currentSession?.records?.[student.username] || "presente"; return `<tr><td><div class="person-cell"><span class="avatar tiny">${escapeHTML(getInitials(student.nombre))}</span><div><strong>${escapeHTML(student.nombre)}</strong><small>${escapeHTML(student.username)}</small></div></div></td><td><div class="table-progress"><span>${getStudentCourseAttendance(course, student)}%</span><i><b style="width:${getStudentCourseAttendance(course, student)}%"></b></i></div></td><td><div class="attendance-status-options">${["presente", "ausente", "justificado"].map((option) => `<label class="attendance-option ${option} ${status === option ? "selected" : ""}"><input type="radio" name="status-${student.username}" value="${option}" ${status === option ? "checked" : ""} required><span>${attendanceStatusLabel(option)}</span></label>`).join("")}</div></td></tr>`; }).join("")}</tbody></table></div>
+        <div class="responsive-table"><table class="data-table attendance-taking-table"><thead><tr><th>Estudiante</th><th>Estado de esta clase</th></tr></thead><tbody>${course.students.map((student) => { const status = currentSession?.records?.[student.username] || "presente"; return `<tr><td><div class="person-cell"><span class="avatar tiny">${escapeHTML(getInitials(student.nombre))}</span><div><strong>${escapeHTML(student.nombre)}</strong><small>${escapeHTML(student.username)}</small></div></div></td><td><div class="attendance-status-options">${["presente", "ausente", "justificado"].map((option) => `<label class="attendance-option ${option} ${status === option ? "selected" : ""}"><input type="radio" name="status-${student.username}" value="${option}" ${status === option ? "checked" : ""} required><span>${attendanceStatusLabel(option)}</span></label>`).join("")}</div></td></tr>`; }).join("")}</tbody></table></div>
         <div class="attendance-form-footer"><span class="save-feedback" id="attendanceSessionFeedback"></span><button type="submit" class="btn-primary compact-button">Guardar asistencia del día</button></div>
       </form>
     </div>
@@ -542,7 +543,7 @@ function renderCourseAttendanceTaking(course) {
 }
 
 function renderCourseGradesOverview(course) {
-  return `<div class="panel section-panel-gap course-management-panel" id="courseGradesPanel"><div class="panel-heading"><div><span class="eyebrow">Calificaciones</span><h3>Notas del curso</h3><p class="panel-caption">Selecciona un estudiante para modificar sus evaluaciones y revisar su promedio.</p></div></div><div class="responsive-table"><table class="data-table"><thead><tr><th>Estudiante</th><th>Evaluación 1</th><th>Evaluación 2</th><th>Evaluación 3</th><th>Promedio</th><th></th></tr></thead><tbody>${course.students.map((student) => { const grades = student.evaluaciones || {}; return `<tr><td><div class="person-cell"><span class="avatar tiny">${escapeHTML(getInitials(student.nombre))}</span><strong>${escapeHTML(student.nombre)}</strong></div></td><td>${formatGrade(grades.prueba1)}</td><td>${formatGrade(grades.prueba2)}</td><td>${formatGrade(grades.prueba3)}</td><td><strong class="grade-emphasis">${formatGrade(student.promedio)}</strong></td><td><button type="button" class="btn-outline course-student-open" data-student-username="${escapeHTML(student.username)}">Editar notas</button></td></tr>`; }).join("")}</tbody></table></div></div>`;
+  return `<div class="panel section-panel-gap course-management-panel" id="courseGradesPanel"><div class="panel-heading"><div><span class="eyebrow">Calificaciones</span><h3>Notas del curso</h3><p class="panel-caption">Edita las notas directamente en la tabla y guarda el promedio del estudiante.</p></div></div><div class="responsive-table"><table class="data-table inline-grades-table"><thead><tr><th>Estudiante</th><th>Evaluación 1</th><th>Evaluación 2</th><th>Evaluación 3</th><th>Promedio</th><th></th></tr></thead><tbody>${course.students.map((student) => { const grades = student.evaluaciones || {}; return `<tr data-grade-student="${escapeHTML(student.username)}"><td><div class="person-cell"><span class="avatar tiny">${escapeHTML(getInitials(student.nombre))}</span><strong>${escapeHTML(student.nombre)}</strong></div></td>${[1, 2, 3].map((number) => `<td><span class="grade-view">${formatGrade(grades[`prueba${number}`])}</span><input class="inline-grade-input" data-grade="prueba${number}" type="number" min="1" max="7" step="0.1" value="${grades[`prueba${number}`] ?? ""}" hidden></td>`).join("")}<td><strong class="grade-emphasis grade-average">${formatGrade(student.promedio)}</strong></td><td><button type="button" class="btn-outline inline-edit-grade" data-student-username="${escapeHTML(student.username)}">Editar notas</button><button type="button" class="btn-primary compact-button inline-save-grade" data-student-username="${escapeHTML(student.username)}" hidden>Guardar</button><span class="save-feedback inline-grade-feedback"></span></td></tr>`; }).join("")}</tbody></table></div></div>`;
 }
 
 function renderCourseWarningsOverview(course) {
@@ -551,13 +552,13 @@ function renderCourseWarningsOverview(course) {
 
 function refreshCourseStudentRows(course, student) {
   const findRow = (selector) => [...document.querySelectorAll(selector)].find((row) => row.dataset.studentUsername === student.username);
-  const studentRow = findRow(".student-select-row");
+  const studentRow = findRow(".student-course-row");
   if (studentRow) {
     const cells = studentRow.querySelectorAll("td");
     if (cells[1]) cells[1].innerHTML = `<strong class="grade-emphasis">${formatGrade(student.promedio)}</strong>`;
     if (cells[2]) cells[2].innerHTML = `<div class="table-progress"><span>${getStudentCourseAttendance(course, student)}%</span><i><b style="width:${getStudentCourseAttendance(course, student)}%"></b></i></div>`;
   }
-  const gradesRow = findRow("#courseGradesPanel .course-student-open")?.closest("tr");
+  const gradesRow = document.querySelector(`#courseGradesPanel tr[data-grade-student="${CSS.escape(student.username)}"]`);
   if (gradesRow) {
     const grades = student.evaluaciones || {};
     const cells = gradesRow.querySelectorAll("td");
@@ -720,7 +721,7 @@ function renderTeacherCourseDetail(courseId) {
       <div class="panel-heading"><div><h3>Seguimiento de estudiantes</h3><p class="panel-caption">Lista completa con calificaciones, asistencia y situación formativa.</p></div><span class="table-note">Última actualización: hoy</span></div>
       <div class="responsive-table"><table class="data-table teacher-student-table"><thead><tr><th>Estudiante</th><th>Promedio</th><th>Porcentaje de asistencia</th></tr></thead><tbody>
         ${course.students.map((student) => `
-          <tr class="student-select-row" data-student-username="${student.username}" tabindex="0" aria-label="Ver detalle de ${escapeHTML(student.nombre)}">
+          <tr class="student-course-row" data-student-username="${escapeHTML(student.username)}" aria-label="${escapeHTML(student.nombre)}">
             <td><div class="person-cell"><span class="avatar tiny">${escapeHTML(getInitials(student.nombre))}</span><div><strong>${escapeHTML(student.nombre)}</strong><small>${escapeHTML(student.username)}</small></div></div></td>
             <td><strong class="grade-emphasis">${formatGrade(student.promedio)}</strong></td>
             <td><div class="table-progress"><span>${getStudentCourseAttendance(course, student)}%</span><i><b style="width:${getStudentCourseAttendance(course, student)}%"></b></i></div></td>
@@ -732,6 +733,7 @@ function renderTeacherCourseDetail(courseId) {
     ${renderCourseAttendanceTaking(course)}
     ${renderCourseGradesOverview(course)}
     ${renderCourseWarningsOverview(course)}
+    <div class="panel section-panel-gap warning-detail-only" id="courseWarningDetail" hidden></div>
     <div class="panel student-detail-panel section-panel-gap" id="teacherStudentDetail"><div class="empty-state compact-empty"><div class="glyph">↓</div>Selecciona un alumno para ver sus notas, asistencia y amonestaciones.</div></div>
   `;
   document.getElementById("backToCourses").addEventListener("click", renderTeacherCourses);
@@ -743,6 +745,10 @@ function renderTeacherCourseDetail(courseId) {
       if (panel) panel.hidden = key !== view;
     });
     document.querySelectorAll(".course-tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.courseView === view));
+    const detail = document.getElementById("teacherStudentDetail");
+    if (detail) detail.hidden = true;
+    const warningDetail = document.getElementById("courseWarningDetail");
+    if (warningDetail && view !== "warnings") warningDetail.hidden = true;
   };
   document.querySelectorAll(".course-tab").forEach((tab) => tab.addEventListener("click", () => showCourseView(tab.dataset.courseView)));
   content.onclick = (event) => {
@@ -754,39 +760,76 @@ function renderTeacherCourseDetail(courseId) {
   };
   showCourseView(courseViewState[course.id] || "students");
 
-  const selectStudent = (row) => {
-    const student = course.students.find((item) => item.username === row.dataset.studentUsername);
-    if (!student) return;
-    const detail = document.getElementById("teacherStudentDetail");
-    detail.innerHTML = renderTeacherStudentDetail(course, student);
-    document.querySelectorAll(".student-select-row").forEach((item) => item.classList.toggle("selected", item === row));
-    bindTeacherStudentDetailActions(course, student);
-    document.getElementById("closeStudentDetail").addEventListener("click", () => {
-      detail.innerHTML = `<div class="empty-state compact-empty"><div class="glyph">↓</div>Selecciona un alumno para ver sus notas, asistencia y amonestaciones.</div>`;
-      row.classList.remove("selected");
-    });
-    detail.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-  document.querySelectorAll(".student-select-row").forEach((row) => {
-    row.addEventListener("click", () => selectStudent(row));
-    row.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        selectStudent(row);
-      }
+  document.querySelectorAll(".inline-edit-grade").forEach((button) => {
+    button.addEventListener("click", () => {
+      const row = button.closest("tr");
+      row.querySelectorAll(".inline-grade-input").forEach((input) => { input.hidden = false; });
+      row.querySelectorAll(".grade-view").forEach((view) => { view.hidden = true; });
+      button.hidden = true;
+      row.querySelector(".inline-save-grade").hidden = false;
     });
   });
-  document.querySelectorAll(".course-student-open, .warning-student-open").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.stopPropagation();
+
+  document.querySelectorAll(".inline-save-grade").forEach((button) => {
+    button.addEventListener("click", () => {
+      const row = button.closest("tr");
       const student = course.students.find((item) => item.username === button.dataset.studentUsername);
-      const row = document.querySelector(`.student-select-row[data-student-username="${CSS.escape(button.dataset.studentUsername)}"]`);
-      if (student && row) {
-        showCourseView("students");
-        selectStudent(row);
+      if (!student) return;
+      const values = [...row.querySelectorAll(".inline-grade-input")].map((input) => Number(input.value));
+      if (values.some((value) => Number.isNaN(value) || value < 1 || value > 7)) {
+        row.querySelector(".inline-grade-feedback").textContent = "Completa las tres notas entre 1,0 y 7,0";
+        return;
       }
+      student.evaluaciones = { prueba1: values[0], prueba2: values[1], prueba3: values[2] };
+      student.promedio = Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1));
+      student.ultimaEvaluacion = "Prueba 3";
+      persistDatabase(db);
+      row.querySelectorAll(".grade-view").forEach((view, index) => { view.textContent = values[index].toFixed(1); view.hidden = false; });
+      row.querySelectorAll(".inline-grade-input").forEach((input) => { input.hidden = true; });
+      row.querySelector(".grade-average").textContent = student.promedio.toFixed(1);
+      button.hidden = true;
+      row.querySelector(".inline-edit-grade").hidden = false;
+      row.querySelector(".inline-grade-feedback").textContent = "Guardado";
+      if (window.Academy7Firebase?.isAvailable?.()) {
+        window.Academy7Firebase.saveStudentRecord(currentUser.username, course.id, student).catch((error) => console.warn("No se pudo guardar la nota en Firebase", error));
+      }
+      refreshCourseStudentRows(course, student);
     });
   });
+
+  document.querySelectorAll(".warning-student-open").forEach((button) => {
+    button.addEventListener("click", () => {
+      const student = course.students.find((item) => item.username === button.dataset.studentUsername);
+      const panel = document.getElementById("courseWarningDetail");
+      if (!student || !panel) return;
+      showCourseView("warnings");
+      panel.hidden = false;
+      const renderWarningDetail = () => {
+        panel.innerHTML = `<div class="panel-heading"><div><span class="eyebrow">Detalle de amonestaciones</span><h3>${escapeHTML(student.nombre)}</h3><p class="panel-caption">Motivo, fecha y descripción.</p></div></div><div class="student-warning-list">${(student.warnings || []).map((warning, index) => `<article class="student-warning-item"><span class="warning-date">${escapeHTML(warning.fecha)}</span><div class="warning-copy"><strong>${escapeHTML(warning.tipo)}</strong><p>${escapeHTML(warning.detalle)}</p></div><button type="button" class="text-button delete-course-warning" data-index="${index}">Eliminar</button></article>`).join("") || '<p class="detail-muted">Sin amonestaciones registradas.</p>'}</div><form id="courseWarningForm" class="warning-form"><div class="warning-form-grid"><label><span>Fecha</span><input name="fecha" type="date" required></label><label><span>Motivo</span><input name="tipo" required></label><label class="warning-detail-field"><span>Descripción</span><textarea name="detalle" rows="2" required></textarea></label></div><button class="btn-primary compact-button" type="submit">Agregar amonestación</button></form>`;
+        panel.querySelectorAll(".delete-course-warning").forEach((removeButton) => removeButton.addEventListener("click", () => {
+          student.warnings.splice(Number(removeButton.dataset.index), 1);
+          student.amonestaciones = student.warnings.length;
+          persistDatabase(db);
+          renderWarningDetail();
+          refreshCourseStudentRows(course, student);
+          if (window.Academy7Firebase?.isAvailable?.()) window.Academy7Firebase.saveStudentRecord(currentUser.username, course.id, student).catch(() => {});
+        }));
+        panel.querySelector("#courseWarningForm")?.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const values = new FormData(event.currentTarget);
+          if (!student.warnings) student.warnings = [];
+          student.warnings.push({ fecha: String(values.get("fecha")), tipo: String(values.get("tipo")).trim(), detalle: String(values.get("detalle")).trim() });
+          student.amonestaciones = student.warnings.length;
+          persistDatabase(db);
+          renderWarningDetail();
+          refreshCourseStudentRows(course, student);
+          if (window.Academy7Firebase?.isAvailable?.()) window.Academy7Firebase.saveStudentRecord(currentUser.username, course.id, student).catch(() => {});
+        });
+      };
+      renderWarningDetail();
+    });
+  });
+
   document.getElementById("courseAttendanceForm").addEventListener("submit", (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -953,6 +996,21 @@ function renderHijos() {
   });
 }
 
+async function hydrateTeacherMessages() {
+  if (teacherMessagesHydrated || !window.Academy7Firebase?.isAvailable?.() || !window.Academy7Firebase.loadTeacherMessages) return;
+  teacherMessagesHydrated = true;
+  try {
+    const remoteMessages = await window.Academy7Firebase.loadTeacherMessages(currentUser.username);
+    if (remoteMessages.length) {
+      db.teacherMessages[currentUser.username] = remoteMessages;
+      persistDatabase(db);
+      if (document.getElementById("teacherMsgList")) renderTeacherMessages("todos");
+    }
+  } catch (error) {
+    console.warn("No se pudieron cargar los mensajes desde Firebase; se conserva el respaldo local.", error);
+  }
+}
+
 function renderTeacherMessages(filter = "todos") {
   setGreeting("Mensajes");
   const messages = getTeacherMessages(currentUser.username);
@@ -965,6 +1023,7 @@ function renderTeacherMessages(filter = "todos") {
       <div class="msg-list" id="teacherMsgList">${filteredMessages.map((message) => `<button class="msg-item ${message.leido ? "" : "unread"}" data-message-id="${message.id}"><div class="from"><span>${escapeHTML(message.nombre)}</span>${!message.leido ? '<span class="dot-unread"></span>' : ""}</div><div class="preview">${escapeHTML(message.asunto)}</div><div class="message-related">${escapeHTML(message.relacionado)}</div></button>`).join("") || `<div class="empty-state"><div class="glyph">·</div>No hay mensajes para este filtro.</div>`}</div>
       <div class="msg-detail" id="teacherMsgDetail"><div class="empty-state"><div class="glyph">·</div>Selecciona una conversación para leerla.</div></div>
     </div>
+    <div class="panel section-panel-gap teacher-message-compose"><div class="panel-heading"><div><span class="eyebrow">Nueva comunicación</span><h3>Enviar mensaje a un estudiante</h3></div></div><form id="teacherMessageForm" class="message-compose-form"><label><span>Estudiante</span><select name="username" required>${getTeacherCourses(currentUser.username).flatMap((course) => course.students.map((student) => `<option value="${escapeHTML(student.username)}">${escapeHTML(student.nombre)} · ${escapeHTML(course.curso)}</option>`)).join("")}</select></label><label><span>Asunto</span><input name="asunto" required placeholder="Asunto del mensaje"></label><label><span>Mensaje</span><textarea name="cuerpo" rows="3" required placeholder="Escribe el mensaje para el estudiante"></textarea></label><button class="btn-primary compact-button" type="submit">Enviar mensaje</button></form></div>
   `;
   document.querySelectorAll(".message-filter").forEach((button) => {
     button.addEventListener("click", () => renderTeacherMessages(button.dataset.filter));
@@ -982,6 +1041,18 @@ function renderTeacherMessages(filter = "todos") {
       document.getElementById("teacherMsgDetail").innerHTML = `<div class="message-detail-top"><span class="message-recipient-pill ${message.destinatario}">${message.destinatario === "apoderado" ? "Apoderado" : "Estudiante"}</span><span class="meta">${escapeHTML(message.fecha)}</span></div><h3>${escapeHTML(message.asunto)}</h3><div class="message-recipient">Para: <strong>${escapeHTML(message.nombre)}</strong><span>${escapeHTML(message.relacionado)}</span></div><div class="body">${escapeHTML(message.cuerpo).replace(/\n/g, "<br>")}</div><button class="btn-outline message-reply">Responder a ${escapeHTML(message.nombre)} →</button>`;
     });
   });
+  document.getElementById("teacherMessageForm")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const values = new FormData(event.currentTarget);
+    const recipient = getUserByUsername(String(values.get("username")));
+    const message = { id: `tm-${Date.now()}`, destinatario: "estudiante", nombre: recipient?.nombre || String(values.get("username")), relacionado: "Mensaje docente", asunto: String(values.get("asunto")).trim(), fecha: new Date().toLocaleDateString("es-CL"), leido: true, cuerpo: String(values.get("cuerpo")).trim() };
+    if (!db.teacherMessages[currentUser.username]) db.teacherMessages[currentUser.username] = [];
+    db.teacherMessages[currentUser.username].unshift(message);
+    persistDatabase(db);
+    if (window.Academy7Firebase?.isAvailable?.()) window.Academy7Firebase.saveTeacherMessage(currentUser.username, message).catch((error) => console.warn("No se pudo guardar el mensaje en Firebase", error));
+    renderTeacherMessages(filter);
+  });
+  hydrateTeacherMessages();
 }
 
 function renderMensajes() {
