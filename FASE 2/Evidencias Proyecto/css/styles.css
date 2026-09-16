@@ -1133,3 +1133,17 @@ button {
   .course-management-tabs { overflow-x: auto; flex-wrap: nowrap; }
   .course-tab { white-space: nowrap; }
 }
+
+
+/* ---------- Teacher course workflow refinements ---------- */
+.student-course-row { cursor: default; }
+.student-course-row:hover { background: transparent; }
+.inline-grade-input { width: 74px; border: 1px solid var(--gold); padding: 7px; background: #fffdf5; }
+.inline-grades-table td:last-child { min-width: 150px; }
+.inline-grade-feedback { display: block; margin: 4px 0 0; }
+.warning-detail-only { border-top: 3px solid var(--brick); }
+.message-compose-form { display: grid; gap: 11px; max-width: 680px; }
+.message-compose-form label { display: flex; flex-direction: column; gap: 5px; }
+.message-compose-form label > span { color: var(--ink-muted); font-size: 10.5px; }
+.message-compose-form input, .message-compose-form select, .message-compose-form textarea { width: 100%; border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 9px; font-family: inherit; font-size: 12px; }
+.message-compose-form input:focus, .message-compose-form select:focus, .message-compose-form textarea:focus { border-color: var(--gold); outline: none; }

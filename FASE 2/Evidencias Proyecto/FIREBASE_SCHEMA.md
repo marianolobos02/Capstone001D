@@ -65,3 +65,13 @@ teachers/{teacherId}/courses/{courseId}/students/{studentId}/warnings/{warningId
 Al guardar una nota, la interfaz recalcula `promedio` y actualiza el registro del estudiante. Al guardar asistencia, calcula el porcentaje usando `attended / total * 100`. Al agregar, editar o eliminar una amonestación, actualiza la colección de advertencias y el contador `amonestaciones` del estudiante.
 
 La integración activa utiliza `saveCourseAttendance` y `saveStudentRecord` desde `js/firebase-config.js`. Si Firestore rechaza una operación por reglas o autenticación, la interfaz conserva el cambio local y muestra un aviso. Las amonestaciones se guardan dentro del registro del estudiante; al editar o eliminar una, se vuelve a guardar el registro completo, por lo que el cambio permanece al cerrar y abrir la aplicación. La siguiente etapa recomendada es activar Firebase Authentication y reemplazar las cuentas demo por usuarios autenticados.
+
+## Mensajes docente-estudiante
+
+Los mensajes se guardan en la subcolección:
+
+```text
+teachers/{teacherId}/messages/{messageId}
+```
+
+Cada documento contiene `destinatario`, `nombre`, `relacionado`, `asunto`, `fecha`, `leido`, `cuerpo` y `updatedAt`. La vista de Mensajes carga las conversaciones desde Firestore al iniciar y los mensajes enviados se guardan inmediatamente en Firestore y en el respaldo local.
