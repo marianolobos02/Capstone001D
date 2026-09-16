@@ -22,7 +22,7 @@ teachers/{teacherId}/courses/{courseId}/students/{studentId}
     total: 110
     attended: 106
   evaluaciones:
-    prueba1: 6.4
+    prueba1: 6.4 # se crea al guardar; inicialmente puede estar vacío
     prueba2: 6.6
     prueba3: 6.5
     examen: 6.7
@@ -43,7 +43,7 @@ teachers/{teacherId}/courses/{courseId}/attendance/{yyyy-mm-dd}
     studentIdC: "justificado"
 ```
 
-El porcentaje individual que se muestra en el curso se calcula como `(presente + justificado) / total de clases registradas * 100`.
+El porcentaje individual que se muestra en el curso se calcula como `(presente + justificado) / total de clases registradas * 100`. Las fechas de asistencia se registran de lunes a viernes; al cambiar de fecha, la interfaz carga la sesión correspondiente o inicia una sesión nueva con todos los estudiantes como `presente`.
 
 Al iniciar una fecha nueva, cada estudiante comienza como `presente` para agilizar el registro; el docente puede cambiar individualmente el estado a `ausente` o `justificado` antes de guardar.
 
@@ -64,4 +64,4 @@ teachers/{teacherId}/courses/{courseId}/students/{studentId}/warnings/{warningId
 
 Al guardar una nota, la interfaz recalcula `promedio` y actualiza el registro del estudiante. Al guardar asistencia, calcula el porcentaje usando `attended / total * 100`. Al agregar, editar o eliminar una amonestación, actualiza la colección de advertencias y el contador `amonestaciones` del estudiante.
 
-La integración activa utiliza `saveCourseAttendance` y `saveStudentRecord` desde `js/firebase-config.js`. Si Firestore rechaza una operación por reglas o autenticación, la interfaz conserva el cambio local y muestra un aviso. La siguiente etapa recomendada es activar Firebase Authentication y reemplazar las cuentas demo por usuarios autenticados.
+La integración activa utiliza `saveCourseAttendance` y `saveStudentRecord` desde `js/firebase-config.js`. Si Firestore rechaza una operación por reglas o autenticación, la interfaz conserva el cambio local y muestra un aviso. Las amonestaciones se guardan dentro del registro del estudiante; al editar o eliminar una, se vuelve a guardar el registro completo, por lo que el cambio permanece al cerrar y abrir la aplicación. La siguiente etapa recomendada es activar Firebase Authentication y reemplazar las cuentas demo por usuarios autenticados.
