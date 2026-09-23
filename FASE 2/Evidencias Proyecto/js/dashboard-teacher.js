@@ -1,282 +1,4 @@
-/* =========================================================
-   Academy7 — Panel principal multirol
-   Vistas disponibles: Docente, Apoderado y Estudiante.
-   ========================================================= */
-
-const currentUser = getCurrentUser();
-if (!currentUser) {
-  window.location.href = "index.html";
-  throw new Error("No hay una sesión activa.");
-}
-
-const db = getDatabase();
-const content = document.getElementById("content");
-const roleKey = getRoleKey(currentUser);
-let selectedChildUsername = null;
-const courseViewState = {};
-let teacherMessagesHydrated = false;
-
-const MESES_LARGO = [
-  "enero", "febrero", "marzo", "abril", "mayo", "junio",
-  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
-];
-const DIAS = [
-  "domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"
-];
-
-const ROLE_CONFIG = {
-  docente: {
-    label: "Docente",
-    description: "Gestiona tus cursos, estudiantes y seguimiento académico.",
-    nav: [
-      ["inicio", "Inicio"],
-      ["perfil", "Mi perfil"],
-      ["cursos", "Mis cursos"],
-      ["horario", "Horario de clases"],
-      ["calendario", "Calendario"],
-      ["amonestaciones", "Amonestaciones"],
-      ["mensajes", "Mensajes"]
-    ]
-  },
-  apoderado: {
-    label: "Apoderado",
-    description: "Acompaña el progreso académico y formativo de tus hijos.",
-    nav: [
-      ["inicio", "Inicio"],
-      ["perfil", "Mi perfil"],
-      ["hijos", "Mis hijos"],
-      ["asistencia", "Asistencia"],
-      ["notas", "Calificaciones"],
-      ["amonestaciones", "Amonestaciones"],
-      ["calendario", "Calendario"]
-    ]
-  },
-  estudiante: {
-    label: "Estudiante",
-    description: "Organiza tu año escolar y revisa tu avance académico.",
-    nav: [
-      ["inicio", "Inicio"],
-      ["perfil", "Mi perfil"],
-      ["cursos", "Mis cursos"],
-      ["horario", "Mi horario"],
-      ["calendario", "Calendario"],
-      ["notas", "Calificaciones"],
-      ["asistencia", "Asistencia"],
-      ["amonestaciones", "Amonestaciones"],
-      ["mensajes", "Mensajes"]
-    ]
-  }
-};
-
-function escapeHTML(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-function fullNameFirst(name) {
-  return String(name || "").trim().split(" ")[0] || "";
-}
-
-function average(values) {
-  const numeric = values.filter((value) => value !== null && value !== undefined && value !== "").map(Number).filter((value) => !Number.isNaN(value));
-  return numeric.length ? (numeric.reduce((sum, value) => sum + value, 0) / numeric.length).toFixed(1) : "—";
-}
-
-function formatGrade(value) {
-  return value === null || value === undefined || value === "" ? "—" : Number(value).toFixed(1);
-}
-
-function formatAttendanceDate(isoDate) {
-  if (!isoDate) return "";
-  const date = new Date(`${isoDate}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return isoDate;
-  const label = `${DIAS[date.getDay()]} ${date.getDate()} de ${MESES_LARGO[date.getMonth()]} de ${date.getFullYear()}`;
-  return label.charAt(0).toUpperCase() + label.slice(1);
-}
-
-function getGuardianChild() {
-  const children = getStudentChildren(currentUser.username);
-  if (!children.length) return null;
-  if (!selectedChildUsername || !children.some((child) => child.username === selectedChildUsername)) {
-    selectedChildUsername = children[0].username;
-  }
-  return children.find((child) => child.username === selectedChildUsername) || children[0];
-}
-
-function getContextStudent() {
-  if (roleKey === "apoderado") return getGuardianChild();
-  if (roleKey === "estudiante") return currentUser;
-  return null;
-}
-
-function getContextUsername() {
-  const student = getContextStudent();
-  return student ? student.username : null;
-}
-
-function getContextLabel() {
-  const student = getContextStudent();
-  return student ? student.nombre : "la comunidad Academy7";
-}
-
-function setGreeting(sectionLabel) {
-  document.getElementById("greetingTitle").textContent = sectionLabel;
-}
-
-function initTopbar() {
-  document.getElementById("topAvatar").textContent = currentUser.iniciales;
-  document.getElementById("topUserName").textContent = currentUser.nombre;
-  document.getElementById("topUserRole").textContent = `${currentUser.rol}${currentUser.curso ? ` · ${currentUser.curso}` : ""}`;
-  const now = new Date();
-  document.getElementById("greetingDate").textContent =
-    `${DIAS[now.getDay()]} ${now.getDate()} de ${MESES_LARGO[now.getMonth()]}`;
-
-  const roleConfig = ROLE_CONFIG[roleKey];
-  document.getElementById("sidebarRole").innerHTML = `
-    <span class="role-label">Sesión activa</span>
-    <strong>${escapeHTML(roleConfig.label)}</strong>
-  `;
-  document.getElementById("navList").innerHTML = roleConfig.nav.map(([section, label]) => `
-    <li><button class="nav-link" data-section="${section}"><span class="dot"></span>${label}</button></li>
-  `).join("");
-
-  document.querySelectorAll(".nav-link").forEach((button) => {
-    button.addEventListener("click", () => goToSection(button.dataset.section));
-  });
-}
-
-function renderSectionIntro(eyebrow, title, description) {
-  return `
-    <div class="section-heading">
-      <div>
-        <div class="eyebrow">${escapeHTML(eyebrow)}</div>
-        <h2 class="section-title">${escapeHTML(title)}</h2>
-        <p class="section-sub">${escapeHTML(description)}</p>
-      </div>
-    </div>
-  `;
-}
-
-function renderMiniStat(number, label, tone = "gold") {
-  return `
-    <div class="panel mini-stat-panel">
-      <div class="mini-stat tone-${tone}">
-        <div class="num">${escapeHTML(number)}</div>
-        <div class="cap">${escapeHTML(label)}</div>
-      </div>
-    </div>
-  `;
-}
-
-function renderProgress(value, label = "Asistencia") {
-  const safeValue = Math.max(0, Math.min(100, Number(value) || 0));
-  return `
-    <div class="progress-wrap">
-      <div class="progress-label"><span>${escapeHTML(label)}</span><strong>${safeValue}%</strong></div>
-      <div class="progress-track"><span style="width:${safeValue}%"></span></div>
-    </div>
-  `;
-}
-
-function renderPill(status, className = "") {
-  return `<span class="pill ${className}">${escapeHTML(status)}</span>`;
-}
-
-function pillForGrade(status) {
-  if (status === "aprobado") return renderPill("Aprobado", "green");
-  if (status === "insuficiente") return renderPill("Insuficiente", "brick");
-  return renderPill("Pendiente", "gold");
-}
-
-function warningCountForStudent(username) {
-  return getStudentWarnings(username).length;
-}
-
-function renderEvents(events, emptyText = "No hay eventos próximos.") {
-  return `
-    <div class="calendar-list">
-      ${events.slice(0, 4).map((event) => `
-        <div class="cal-row">
-          <div class="cal-date">
-            <div class="day">${escapeHTML(event.dia)}</div>
-            <div class="mon">${escapeHTML(event.mes)}</div>
-          </div>
-          <div class="cal-info">
-            <h4>${escapeHTML(event.titulo)}</h4>
-            <p>${escapeHTML(event.detalle)}</p>
-          </div>
-        </div>
-      `).join("") || `<div class="empty-state"><div class="glyph">·</div>${escapeHTML(emptyText)}</div>`}
-    </div>
-  `;
-}
-
-function renderSchedule(schedule, compact = false) {
-  if (!schedule.length) {
-    return `<div class="empty-state"><div class="glyph">·</div>No hay horario disponible.</div>`;
-  }
-  return `
-    <div class="schedule-grid ${compact ? "compact" : ""}">
-      ${schedule.map((day) => `
-        <div class="schedule-day">
-          <div class="schedule-day-title">${escapeHTML(day.dia)}</div>
-          <div class="schedule-blocks">
-            ${day.bloques.map((block) => `
-              <div class="schedule-block">
-                <span class="schedule-time">${escapeHTML(block.hora)}</span>
-                <strong>${escapeHTML(block.curso)}</strong>
-                <small>${escapeHTML(block.sala)}</small>
-              </div>
-            `).join("")}
-          </div>
-        </div>
-      `).join("")}
-    </div>
-  `;
-}
-
-function renderChildPicker(children) {
-  if (children.length <= 1) return "";
-  return `
-    <div class="child-picker panel">
-      <div>
-        <span class="eyebrow">Vista familiar</span>
-        <strong>Selecciona a uno de tus hijos</strong>
-      </div>
-      <div class="child-tabs">
-        ${children.map((child) => `
-          <button class="child-tab ${child.username === selectedChildUsername ? "active" : ""}" data-child="${child.username}">
-            <span class="avatar small">${escapeHTML(child.iniciales)}</span>
-            ${escapeHTML(fullNameFirst(child.nombre))} · ${escapeHTML(child.curso)}
-          </button>
-        `).join("")}
-      </div>
-    </div>
-  `;
-}
-
-function bindChildPicker() {
-  document.querySelectorAll(".child-tab").forEach((button) => {
-    button.addEventListener("click", () => {
-      selectedChildUsername = button.dataset.child;
-      const activeSection = document.querySelector(".nav-link.active")?.dataset.section || "inicio";
-      goToSection(activeSection);
-    });
-  });
-}
-
-// ---------- Inicio ----------
-
-function renderInicio() {
-  setGreeting(`Hola, ${fullNameFirst(currentUser.nombre)}`);
-  if (roleKey === "docente") return renderTeacherHome();
-  if (roleKey === "apoderado") return renderGuardianHome();
-  return renderStudentHome();
-}
+/* Academy7 Docente view: courses, attendance, grades, warnings and messages. */
 
 function renderTeacherHome() {
   const courses = getTeacherCourses(currentUser.username);
@@ -322,124 +44,6 @@ function renderTeacherHome() {
   });
 }
 
-function renderStudentHome() {
-  const username = currentUser.username;
-  const courses = getStudentCourses(username);
-  const events = getStudentEvents(username);
-  const grades = getStudentGrades(username);
-  const attendance = getStudentAttendance(username);
-  const warnings = getStudentWarnings(username);
-  const messages = getMessages(username);
-  const noLeidos = messages.filter((message) => !message.leido).length;
-  const averageGrade = getStudentAverage(username);
-
-  content.innerHTML = `
-    ${renderSectionIntro("Panel del estudiante", ROLE_CONFIG.estudiante.description, `Año escolar 2026 · ${currentUser.nivel} · ${currentUser.curso}`)}
-    <div class="role-banner student-banner">
-      <div><span class="eyebrow inverse">Tu avance este año</span><h3>Hola, ${escapeHTML(fullNameFirst(currentUser.nombre))}</h3><p>Tu asistencia general es ${attendance.percent}%. Sigue revisando tus evaluaciones y actividades próximas.</p></div>
-      <div class="attendance-ring" style="--percent:${attendance.percent}%"><strong>${attendance.percent}%</strong><small>asistencia</small></div>
-    </div>
-    <div class="home-grid">
-      <div class="panel">
-        <div class="panel-heading"><h3>Próximos eventos</h3><button class="text-button" data-go="calendario">Ver todo →</button></div>
-        ${renderEvents(events)}
-      </div>
-      <div class="mini-stack">
-        ${renderMiniStat(courses.length, "Cursos registrados este año", "gold")}
-        ${renderMiniStat(averageGrade, "Promedio general actual", "navy")}
-        ${renderMiniStat(noLeidos, "Mensajes sin leer", noLeidos ? "brick" : "green")}
-      </div>
-    </div>
-    <div class="quick-panels">
-      <div class="panel"><div class="panel-heading"><h3>Asistencia</h3><button class="text-button" data-go="asistencia">Detalle →</button></div>${renderProgress(attendance.percent, `${attendance.attended} de ${attendance.total} clases asistidas`)}<div class="inline-metrics"><span><b>${attendance.absences}</b> inasistencias</span><span><b>${attendance.late}</b> atrasos</span></div></div>
-      <div class="panel"><div class="panel-heading"><h3>Estado académico</h3><button class="text-button" data-go="notas">Ver notas →</button></div><div class="status-overview"><span class="status-number">${grades.length}</span><span>evaluaciones registradas<br><small>${warnings.length ? `${warnings.length} amonestación(es) en seguimiento` : "Sin amonestaciones registradas"}</small></span></div></div>
-    </div>
-  `;
-  bindGoButtons();
-}
-
-function renderGuardianHome() {
-  const children = getStudentChildren(currentUser.username);
-  const child = getGuardianChild();
-  const attendance = child ? getStudentAttendance(child.username) : null;
-  const grades = child ? getStudentGrades(child.username) : [];
-  const warnings = child ? getStudentWarnings(child.username) : [];
-  const events = child ? getStudentEvents(child.username) : [];
-
-  content.innerHTML = `
-    ${renderSectionIntro("Panel del apoderado", ROLE_CONFIG.apoderado.description, `${children.length} hijo(s) asociado(s) a tu cuenta`)}
-    ${renderChildPicker(children)}
-    <div class="role-banner guardian-banner">
-      <div><span class="eyebrow inverse">Seguimiento familiar</span><h3>${child ? `Resumen de ${escapeHTML(fullNameFirst(child.nombre))}` : "Sin estudiantes asociados"}</h3><p>${child ? `${escapeHTML(child.curso)} · Revisa su asistencia, calificaciones y situación formativa.` : "Solicita al colegio asociar a tu hijo o hija a tu cuenta."}</p></div>
-      ${child ? `<div class="attendance-ring" style="--percent:${attendance.percent}%"><strong>${attendance.percent}%</strong><small>asistencia</small></div>` : ""}
-    </div>
-    <div class="home-grid">
-      <div class="panel">
-        <div class="panel-heading"><h3>Próximas actividades</h3><button class="text-button" data-go="calendario">Ver calendario →</button></div>
-        ${renderEvents(events, "No hay actividades para este estudiante.")}
-      </div>
-      <div class="mini-stack">
-        ${renderMiniStat(children.length, "Hijos asociados", "gold")}
-        ${renderMiniStat(child ? getStudentAverage(child.username) : "—", "Promedio general", "navy")}
-        ${renderMiniStat(child ? warnings.length : 0, "Amonestaciones", warnings.length ? "brick" : "green")}
-      </div>
-    </div>
-    ${child ? `<div class="quick-panels"><div class="panel"><div class="panel-heading"><h3>Asistencia de ${escapeHTML(fullNameFirst(child.nombre))}</h3><button class="text-button" data-go="asistencia">Ver detalle →</button></div>${renderProgress(attendance.percent, `${attendance.attended} de ${attendance.total} clases asistidas`)}<div class="inline-metrics"><span><b>${attendance.absences}</b> inasistencias</span><span><b>${attendance.late}</b> atrasos</span></div></div><div class="panel"><div class="panel-heading"><h3>Últimas calificaciones</h3><button class="text-button" data-go="notas">Ver todas →</button></div><div class="compact-grade-list">${grades.slice(0, 3).map((grade) => `<div><span>${escapeHTML(grade.curso)}</span><strong>${Number(grade.nota).toFixed(1)}</strong></div>`).join("")}</div></div></div>` : ""}
-  `;
-  bindChildPicker();
-  bindGoButtons();
-}
-
-// ---------- Perfil ----------
-
-function renderPerfil() {
-  setGreeting("Mi perfil");
-  const subtitle = roleKey === "docente" ? "Información profesional y datos de contacto institucional." : roleKey === "apoderado" ? "Tus datos de contacto y estudiantes asociados." : "Tu información como estudiante del colegio.";
-  const extraInfo = roleKey === "docente"
-    ? `<div class="info-item"><div class="k">Departamento</div><div class="v">${escapeHTML(currentUser.departamento)}</div></div><div class="info-item"><div class="k">Teléfono</div><div class="v">${escapeHTML(currentUser.telefono)}</div></div>`
-    : roleKey === "apoderado"
-      ? `<div class="info-item"><div class="k">Teléfono</div><div class="v">${escapeHTML(currentUser.telefono)}</div></div><div class="info-item"><div class="k">Dirección</div><div class="v">${escapeHTML(currentUser.direccion)}</div></div>`
-      : `<div class="info-item"><div class="k">Nivel</div><div class="v">${escapeHTML(currentUser.nivel)}</div></div><div class="info-item"><div class="k">Curso</div><div class="v">${escapeHTML(currentUser.curso)}</div></div>`;
-
-  content.innerHTML = `
-    ${renderSectionIntro(`Cuenta ${currentUser.rol}`, "Mi perfil", subtitle)}
-    <div class="panel profile-panel">
-      <div class="profile-header">
-        <div class="avatar large role-${roleKey}">${escapeHTML(currentUser.iniciales)}</div>
-        <div><h2>${escapeHTML(currentUser.nombre)}</h2><div class="role">${escapeHTML(currentUser.rol)}${currentUser.curso ? ` · ${escapeHTML(currentUser.curso)}` : ""}</div></div>
-        <span class="profile-status">Cuenta activa</span>
-      </div>
-      <div class="info-grid">
-        <div class="info-item"><div class="k">RUT</div><div class="v">${escapeHTML(currentUser.rut)}</div></div>
-        <div class="info-item"><div class="k">Correo institucional</div><div class="v">${escapeHTML(currentUser.correo)}</div></div>
-        ${extraInfo}
-      </div>
-    </div>
-    ${roleKey === "apoderado" ? `<div class="panel section-panel-gap"><div class="panel-heading"><h3>Personas a tu cargo</h3><button class="text-button" data-go="hijos">Ver estudiantes →</button></div><div class="linked-children">${getStudentChildren(currentUser.username).map((child) => `<div class="linked-child"><span class="avatar small">${escapeHTML(child.iniciales)}</span><div><strong>${escapeHTML(child.nombre)}</strong><small>${escapeHTML(child.curso)} · ${escapeHTML(child.nivel)}</small></div></div>`).join("")}</div></div>` : ""}
-  `;
-  bindGoButtons();
-}
-
-// ---------- Cursos ----------
-
-function renderCursos() {
-  if (roleKey === "docente") return renderTeacherCourses();
-  setGreeting("Mis cursos");
-  const courses = getStudentCourses(currentUser.username);
-  content.innerHTML = `
-    ${renderSectionIntro("Año escolar 2026", "Mis cursos", `Asignaturas registradas en ${escapeHTML(currentUser.nivel)} · ${escapeHTML(currentUser.curso)}.`)}
-    <div class="course-grid">
-      ${courses.map((course) => `
-        <div class="course-card student-course-card">
-          <span class="course-kicker">Asignatura</span>
-          <h4>${escapeHTML(course.nombre)}</h4>
-          <div class="teacher">${escapeHTML(course.profesor)}</div>
-          <div class="meta"><span>${escapeHTML(course.sala)}</span><span>${escapeHTML(course.horario)}</span></div>
-        </div>
-      `).join("")}
-    </div>
-  `;
-}
 
 function renderTeacherCourses() {
   setGreeting("Mis cursos");
@@ -480,6 +84,7 @@ async function hydrateCourseAttendance(course) {
       student.asistencia = getStudentCourseAttendance(course, student);
     });
     persistDatabase(db);
+    refreshCourseSummaryStats(course);
     course.students.forEach((student) => refreshCourseStudentRows(course, student));
     const attendancePanel = document.getElementById("courseAttendancePanel");
     if (attendancePanel) {
@@ -511,6 +116,7 @@ async function hydrateCourseStudents(course) {
     if (!changed) return;
     persistDatabase(db);
     course.students.forEach((student) => refreshCourseStudentRows(course, student));
+    refreshCourseSummaryStats(course);
   } catch (error) {
     console.warn("Academy7: no se pudieron leer estudiantes desde Firestore; se conserva el respaldo local.", error);
   }
@@ -528,13 +134,22 @@ function getStudentCourseAttendance(course, student) {
   return Math.round((attended / records.length) * 100);
 }
 
+function refreshCourseSummaryStats(course) {
+  const gradeStat = document.querySelector("#courseAverageStat .num");
+  const attendanceStat = document.querySelector("#courseAttendanceStat .num");
+  const gradeAverage = average(course.students.map((student) => student.promedio));
+  const attendanceAverage = average(course.students.map((student) => getStudentCourseAttendance(course, student)));
+  if (gradeStat) gradeStat.textContent = gradeAverage;
+  if (attendanceStat) attendanceStat.textContent = `${attendanceAverage === "—" ? 0 : attendanceAverage}%`;
+}
+
 function attendanceStatusLabel(status) {
   return ({ presente: "Presente", ausente: "Ausente", justificado: "Justificado" })[status] || "Sin registrar";
 }
 
 function renderCourseAttendanceTaking(course) {
   const records = getCourseAttendanceRecords(course);
-  const selectedDate = records[records.length - 1]?.fecha || new Date().toISOString().slice(0, 10);
+  const selectedDate = courseAttendanceDateState[course.id] || records[records.length - 1]?.fecha || new Date().toISOString().slice(0, 10);
   const currentSession = records.find((session) => session.fecha === selectedDate);
   return `
     <div class="panel attendance-taking-panel section-panel-gap" id="courseAttendancePanel">
@@ -568,8 +183,8 @@ function refreshCourseStudentRows(course, student) {
   if (gradesRow) {
     const grades = student.evaluaciones || {};
     const cells = gradesRow.querySelectorAll("td");
-    [1, 2, 3].forEach((index) => { if (cells[index]) cells[index].textContent = formatGrade(grades[`prueba${index}`]); });
-    if (cells[4]) cells[4].innerHTML = `<strong class="grade-emphasis">${formatGrade(student.promedio)}</strong>`;
+    ["prueba1", "prueba2", "prueba3", "examen"].forEach((key, index) => { if (cells[index + 1]) cells[index + 1].textContent = formatGrade(grades[key]); });
+    if (cells[5]) cells[5].innerHTML = `<strong class="grade-emphasis">${formatGrade(student.promedio)}</strong>`;
   }
   const warningsRow = findRow("#courseWarningsPanel .warning-student-open")?.closest("tr");
   if (warningsRow) {
@@ -706,16 +321,14 @@ function renderTeacherCourseDetail(courseId) {
   setGreeting(course.curso);
   const averageAttendance = average(course.students.map((student) => getStudentCourseAttendance(course, student)));
   const averageGrade = average(course.students.map((student) => student.promedio));
-  const warningTotal = course.students.reduce((total, student) => total + student.amonestaciones, 0);
 
   content.innerHTML = `
     <div class="back-link" id="backToCourses">← Volver a mis cursos</div>
     ${renderSectionIntro("Gestión de curso", `${course.nombre} · ${course.curso}`, `${course.sala} · ${course.horario} · ${course.periodo}`)}
     <div class="detail-stat-grid">
       ${renderMiniStat(course.students.length, "Alumnos en el curso", "gold")}
-      ${renderMiniStat(averageGrade, "Promedio del curso", "navy")}
-      ${renderMiniStat(`${averageAttendance}%`, "Asistencia promedio", "green")}
-      ${renderMiniStat(warningTotal, "Amonestaciones", warningTotal ? "brick" : "green")}
+      <div class="panel mini-stat-panel" id="courseAverageStat"><div class="mini-stat tone-navy"><div class="num">${averageGrade}</div><div class="cap">Promedio del curso</div></div></div>
+      <div class="panel mini-stat-panel" id="courseAttendanceStat"><div class="mini-stat tone-green"><div class="num">${averageAttendance === "—" ? 0 : averageAttendance}%</div><div class="cap">Asistencia promedio</div></div></div>
     </div>
     <div class="course-management-tabs" role="tablist" aria-label="Gestión del curso">
       <button type="button" class="course-tab active" data-course-view="students">Lista de estudiantes</button>
@@ -769,10 +382,10 @@ function renderTeacherCourseDetail(courseId) {
   document.querySelectorAll(".inline-edit-grade").forEach((button) => {
     button.addEventListener("click", () => {
       const row = button.closest("tr");
-      row.querySelectorAll(".inline-grade-input").forEach((input) => { input.hidden = false; });
-      row.querySelectorAll(".grade-view").forEach((view) => { view.hidden = true; });
-      button.hidden = true;
-      row.querySelector(".inline-save-grade").hidden = false;
+      row.querySelectorAll(".inline-grade-input").forEach((input) => input.removeAttribute("hidden"));
+      row.querySelectorAll(".grade-view").forEach((view) => view.setAttribute("hidden", "hidden"));
+      button.setAttribute("hidden", "hidden");
+      row.querySelector(".inline-save-grade").removeAttribute("hidden");
     });
   });
 
@@ -794,16 +407,17 @@ function renderTeacherCourseDetail(courseId) {
       student.ultimaEvaluacion = lastEntered ? lastEntered.dataset.grade : "";
       student.estado = enteredValues.length ? "Regular" : "Pendiente";
       persistDatabase(db);
-      row.querySelectorAll(".grade-view").forEach((view, index) => { view.textContent = formatGrade(student.evaluaciones[inputs[index].dataset.grade]); view.hidden = false; });
-      row.querySelectorAll(".inline-grade-input").forEach((input) => { input.hidden = true; });
+      row.querySelectorAll(".grade-view").forEach((view, index) => { view.textContent = formatGrade(student.evaluaciones[inputs[index].dataset.grade]); view.removeAttribute("hidden"); });
+      row.querySelectorAll(".inline-grade-input").forEach((input) => { input.setAttribute("hidden", "hidden"); });
       row.querySelector(".grade-average").textContent = formatGrade(student.promedio);
-      button.hidden = true;
-      row.querySelector(".inline-edit-grade").hidden = false;
+      button.setAttribute("hidden", "hidden");
+      row.querySelector(".inline-edit-grade").removeAttribute("hidden");
       row.querySelector(".inline-grade-feedback").textContent = "Guardado";
       if (window.Academy7Firebase?.isAvailable?.()) {
         window.Academy7Firebase.saveStudentRecord(currentUser.username, course.id, student).catch((error) => console.warn("No se pudo guardar la nota en Firebase", error));
       }
       refreshCourseStudentRows(course, student);
+      refreshCourseSummaryStats(course);
     });
   });
 
@@ -853,6 +467,7 @@ function renderTeacherCourseDetail(courseId) {
     const records = Object.fromEntries(course.students.map((student) => [student.username, String(form.get(`status-${student.username}`) || "presente")]));
     if (Object.values(records).some((status) => !["presente", "ausente", "justificado"].includes(status))) return;
     if (!Array.isArray(course.attendanceRecords)) course.attendanceRecords = [];
+    courseAttendanceDateState[course.id] = fecha;
     const existing = course.attendanceRecords.find((session) => session.fecha === fecha);
     if (existing) existing.records = records;
     else course.attendanceRecords.push({ fecha, records });
@@ -872,6 +487,7 @@ function renderTeacherCourseDetail(courseId) {
           });
         });
       }
+      refreshCourseSummaryStats(course);
       renderTeacherCourseDetail(course.id, false);
       document.getElementById("attendanceSessionFeedback")?.replaceChildren(document.createTextNode("Guardado en Firebase"));
     }).catch((error) => {
@@ -881,6 +497,7 @@ function renderTeacherCourseDetail(courseId) {
     });
   });
   document.querySelector("#courseAttendanceForm input[name='fecha']")?.addEventListener("change", (event) => {
+    courseAttendanceDateState[course.id] = event.currentTarget.value;
     if (event.currentTarget.value) renderTeacherCourseDetail(course.id);
   });
   document.querySelectorAll(".attendance-option input").forEach((input) => {
@@ -895,87 +512,6 @@ function renderTeacherCourseDetail(courseId) {
 
 // ---------- Horarios y calendario ----------
 
-function renderHorario() {
-  setGreeting(roleKey === "docente" ? "Horario de clases" : "Mi horario");
-  if (roleKey === "docente") {
-    content.innerHTML = `
-      ${renderSectionIntro("Agenda docente", "Horario de clases", "Tus bloques de clases, planificación y reuniones durante la semana.")}
-      <div class="panel schedule-panel">${renderSchedule(getTeacherSchedule(currentUser.username))}</div>
-    `;
-    return;
-  }
-  const username = currentUser.username;
-  content.innerHTML = `
-    ${renderSectionIntro("Año escolar 2026", "Mi horario", `Horario semanal de ${escapeHTML(currentUser.curso)} · ${escapeHTML(currentUser.nivel)}.`)}
-    <div class="panel schedule-panel">${renderSchedule(getStudentSchedule(username))}</div>
-  `;
-}
-
-function renderCalendario() {
-  setGreeting("Calendario");
-  let events;
-  let description;
-  if (roleKey === "docente") {
-    events = getTeacherEvents(currentUser.username);
-    description = "Pruebas, reuniones y compromisos de tu agenda docente.";
-  } else {
-    const child = getContextStudent();
-    events = child ? getStudentEvents(child.username) : [];
-    description = roleKey === "apoderado" ? `Actividades y comunicaciones de ${child ? child.nombre : "tu hijo/a"}.` : "Pruebas, entregas y actividades programadas.";
-  }
-  content.innerHTML = `
-    ${renderSectionIntro(roleKey === "docente" ? "Agenda docente" : roleKey === "apoderado" ? "Agenda familiar" : "Agenda escolar", "Calendario", description)}
-    ${roleKey === "apoderado" ? renderChildPicker(getStudentChildren(currentUser.username)) : ""}
-    <div class="panel"><div class="calendar-list full-calendar-list">${events.map((event) => `<div class="cal-row"><div class="cal-date"><div class="day">${escapeHTML(event.dia)}</div><div class="mon">${escapeHTML(event.mes)}</div></div><div class="cal-info"><h4>${escapeHTML(event.titulo)}</h4><p>${escapeHTML(event.detalle)}</p></div></div>`).join("") || `<div class="empty-state"><div class="glyph">·</div>No hay eventos programados.</div>`}</div></div>
-  `;
-  if (roleKey === "apoderado") bindChildPicker();
-}
-
-// ---------- Calificaciones, asistencia y amonestaciones ----------
-
-function renderNotas() {
-  setGreeting("Calificaciones");
-  const username = getContextUsername();
-  const student = getContextStudent();
-  const grades = username ? getStudentGrades(username) : [];
-  const gradeAverage = username ? getStudentAverage(username) : "—";
-  content.innerHTML = `
-    ${renderSectionIntro(roleKey === "apoderado" ? "Seguimiento familiar" : "Rendimiento académico", "Calificaciones", roleKey === "apoderado" ? `Notas registradas de ${student ? escapeHTML(student.nombre) : "tu hijo/a"}.` : "Calificaciones registradas durante el año escolar 2026.")}
-    ${roleKey === "apoderado" ? renderChildPicker(getStudentChildren(currentUser.username)) : ""}
-    <div class="detail-stat-grid three-col"><div class="panel"><div class="stat-highlight"><strong>${gradeAverage}</strong><span>promedio general</span></div></div><div class="panel"><div class="stat-highlight"><strong>${grades.length}</strong><span>evaluaciones registradas</span></div></div><div class="panel"><div class="stat-highlight"><strong>${grades.filter((grade) => grade.nota < 4).length}</strong><span>evaluaciones insuficientes</span></div></div></div>
-    <div class="panel section-panel-gap"><div class="responsive-table"><table class="data-table"><thead><tr><th>Asignatura</th><th>Evaluación</th><th>Nota</th><th>Estado</th></tr></thead><tbody>${grades.map((grade) => `<tr><td><strong>${escapeHTML(grade.curso)}</strong></td><td>${escapeHTML(grade.evaluacion)}</td><td><strong class="grade-emphasis">${Number(grade.nota).toFixed(1)}</strong></td><td>${pillForGrade(grade.estado)}</td></tr>`).join("") || `<tr><td colspan="4" class="table-empty">No hay calificaciones registradas.</td></tr>`}</tbody></table></div></div>
-  `;
-  if (roleKey === "apoderado") bindChildPicker();
-}
-
-function renderAsistencia() {
-  setGreeting("Asistencia");
-  const username = getContextUsername();
-  const student = getContextStudent();
-  const attendance = username ? getStudentAttendance(username) : { percent: 0, total: 0, attended: 0, absences: 0, late: 0, byCourse: [] };
-  content.innerHTML = `
-    ${renderSectionIntro(roleKey === "apoderado" ? "Seguimiento familiar" : "Registro escolar", "Asistencia", roleKey === "apoderado" ? `Porcentaje de clases asistidas de ${student ? escapeHTML(student.nombre) : "tu hijo/a"}.` : "Tu porcentaje de clases asistidas y detalle por asignatura.")}
-    ${roleKey === "apoderado" ? renderChildPicker(getStudentChildren(currentUser.username)) : ""}
-    <div class="attendance-overview panel"><div class="attendance-score"><div class="attendance-ring large-ring" style="--percent:${attendance.percent}%"><strong>${attendance.percent}%</strong><small>asistencia</small></div><div><span class="eyebrow">Resumen anual</span><h3>${attendance.attended} de ${attendance.total} clases asistidas</h3><p>${attendance.percent >= 90 ? "Tu asistencia se encuentra en un rango favorable." : "Revisa tus inasistencias y justificaciones con el colegio."}</p></div></div><div class="attendance-metrics"><div><strong>${attendance.absences}</strong><span>Inasistencias</span></div><div><strong>${attendance.late}</strong><span>Atrasos</span></div><div><strong>${attendance.total}</strong><span>Clases registradas</span></div></div></div>
-    <div class="panel section-panel-gap"><div class="panel-heading"><h3>Asistencia por asignatura</h3><span class="table-note">Porcentaje de clases asistidas</span></div><div class="responsive-table"><table class="data-table"><thead><tr><th>Asignatura</th><th>Clases asistidas</th><th>Porcentaje</th><th>Avance</th></tr></thead><tbody>${attendance.byCourse.map((item) => `<tr><td><strong>${escapeHTML(item.curso)}</strong></td><td>${escapeHTML(item.asistidas)}</td><td><strong>${item.porcentaje}%</strong></td><td><div class="table-progress wide"><i><b style="width:${item.porcentaje}%"></b></i></div></td></tr>`).join("") || `<tr><td colspan="4" class="table-empty">No hay detalle por asignatura.</td></tr>`}</tbody></table></div></div>
-  `;
-  if (roleKey === "apoderado") bindChildPicker();
-}
-
-function renderAmonestaciones() {
-  setGreeting("Amonestaciones");
-  if (roleKey === "docente") return renderTeacherWarnings();
-  const username = getContextUsername();
-  const student = getContextStudent();
-  const warnings = username ? getStudentWarnings(username) : [];
-  content.innerHTML = `
-    ${renderSectionIntro(roleKey === "apoderado" ? "Seguimiento formativo" : "Convivencia escolar", "Amonestaciones", roleKey === "apoderado" ? `Registro de observaciones y amonestaciones de ${student ? escapeHTML(student.nombre) : "tu hijo/a"}.` : "Revisa el estado de tus observaciones formativas y académicas.")}
-    ${roleKey === "apoderado" ? renderChildPicker(getStudentChildren(currentUser.username)) : ""}
-    <div class="warning-summary ${warnings.length ? "has-warnings" : "clear-warnings"}"><span class="warning-icon">${warnings.length ? "!" : "✓"}</span><div><strong>${warnings.length ? `${warnings.length} registro(s) requieren seguimiento` : "Sin amonestaciones registradas"}</strong><p>${warnings.length ? "Si necesitas más información, comunícate con el profesor jefe o convivencia escolar." : "El estudiante mantiene un registro formativo sin observaciones pendientes."}</p></div></div>
-    <div class="warning-list">${warnings.map((warning) => `<article class="warning-card"><div class="warning-card-top"><span class="eyebrow">${escapeHTML(warning.fecha)}</span>${renderPill(warning.estado, warning.estado === "Pendiente" ? "brick" : "gold")}</div><h3>${escapeHTML(warning.tipo)}</h3><div class="warning-course">${escapeHTML(warning.curso)}</div><p>${escapeHTML(warning.detalle)}</p></article>`).join("") || `<div class="panel empty-state"><div class="glyph">✓</div>No existen registros para mostrar.</div>`}</div>
-  `;
-  if (roleKey === "apoderado") bindChildPicker();
-}
 
 function renderTeacherWarnings() {
   const warnings = getTeacherWarnings(currentUser.username);
@@ -986,25 +522,6 @@ function renderTeacherWarnings() {
   `;
 }
 
-function renderHijos() {
-  setGreeting("Mis hijos");
-  const children = getStudentChildren(currentUser.username);
-  content.innerHTML = `
-    ${renderSectionIntro("Cuenta familiar", "Mis hijos", "Selecciona a cada estudiante para revisar su información académica y formativa.")}
-    <div class="children-grid">${children.map((child) => {
-      const attendance = getStudentAttendance(child.username);
-      const grades = getStudentGrades(child.username);
-      const warnings = getStudentWarnings(child.username);
-      return `<button class="child-card ${child.username === selectedChildUsername ? "active" : ""}" data-child-card="${child.username}"><div class="child-card-head"><span class="avatar large">${escapeHTML(child.iniciales)}</span><span class="child-card-arrow">→</span></div><h3>${escapeHTML(child.nombre)}</h3><p>${escapeHTML(child.curso)} · ${escapeHTML(child.nivel)}</p><div class="child-card-stats"><span><b>${getStudentAverage(child.username)}</b><small>promedio</small></span><span><b>${attendance.percent}%</b><small>asistencia</small></span><span><b>${warnings.length}</b><small>amonestaciones</small></span></div><div class="child-card-footer">${grades.length} evaluaciones registradas · Ver seguimiento</div></button>`;
-    }).join("") || `<div class="panel empty-state"><div class="glyph">·</div>No hay hijos asociados a esta cuenta.</div>`}</div>
-  `;
-  document.querySelectorAll("[data-child-card]").forEach((button) => {
-    button.addEventListener("click", () => {
-      selectedChildUsername = button.dataset.childCard;
-      goToSection("inicio");
-    });
-  });
-}
 
 async function hydrateTeacherMessages() {
   if (teacherMessagesHydrated || !window.Academy7Firebase?.isAvailable?.() || !window.Academy7Firebase.loadTeacherMessages) return;
@@ -1065,74 +582,4 @@ function renderTeacherMessages(filter = "todos") {
   hydrateTeacherMessages();
 }
 
-function renderMensajes() {
-  if (roleKey === "docente") return renderTeacherMessages();
-  setGreeting("Mensajes");
-  const messages = getMessages(currentUser.username);
-  content.innerHTML = `
-    ${renderSectionIntro("Comunicaciones", "Mensajes", "Comunicaciones de profesores y del colegio.")}
-    <div class="msg-layout">
-      <div class="msg-list" id="msgList">${messages.map((message, index) => `<button class="msg-item" data-index="${index}"><div class="from"><span>${escapeHTML(message.de)}</span>${!message.leido ? '<span class="dot-unread"></span>' : ""}</div><div class="preview">${escapeHTML(message.asunto)}</div></button>`).join("") || `<div class="empty-state"><div class="glyph">·</div>No tienes mensajes nuevos.</div>`}</div>
-      <div class="msg-detail" id="msgDetail"><div class="empty-state"><div class="glyph">·</div>Selecciona un mensaje para leerlo.</div></div>
-    </div>
-  `;
-  const items = content.querySelectorAll(".msg-item");
-  items.forEach((button) => {
-    button.addEventListener("click", () => {
-      const index = Number(button.dataset.index);
-      const message = messages[index];
-      message.leido = true;
-      db.messages[currentUser.username] = messages;
-      persistDatabase(db);
-      items.forEach((item) => item.classList.remove("active"));
-      button.classList.add("active");
-      button.querySelector(".dot-unread")?.remove();
-      document.getElementById("msgDetail").innerHTML = `<h3>${escapeHTML(message.asunto)}</h3><div class="meta">De: ${escapeHTML(message.de)} · ${escapeHTML(message.fecha)}</div><div class="body">${escapeHTML(message.cuerpo).replace(/\n/g, "<br>")}</div>`;
-    });
-  });
-}
 
-function bindGoButtons() {
-  document.querySelectorAll("[data-go]").forEach((button) => {
-    button.addEventListener("click", () => goToSection(button.dataset.go));
-  });
-}
-
-const sections = {
-  inicio: renderInicio,
-  perfil: renderPerfil,
-  cursos: renderCursos,
-  horario: renderHorario,
-  calendario: renderCalendario,
-  notas: renderNotas,
-  asistencia: renderAsistencia,
-  amonestaciones: renderAmonestaciones,
-  hijos: renderHijos,
-  mensajes: renderMensajes
-};
-
-function goToSection(name) {
-  document.querySelectorAll(".nav-link").forEach((button) => {
-    button.classList.toggle("active", button.dataset.section === name);
-  });
-  (sections[name] || renderInicio)();
-  document.getElementById("sidebar").classList.remove("open");
-  window.scrollTo(0, 0);
-}
-
-document.getElementById("logoutBtn").addEventListener("click", async () => {
-  try {
-    await window.Academy7Firebase?.signOut?.();
-  } catch (error) {
-    console.warn("Academy7: no se pudo cerrar la sesión de Firebase.", error);
-  }
-  clearSession();
-  window.location.href = "index.html";
-});
-
-document.getElementById("mobileToggle").addEventListener("click", () => {
-  document.getElementById("sidebar").classList.toggle("open");
-});
-
-initTopbar();
-goToSection("inicio");
