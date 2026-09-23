@@ -164,7 +164,7 @@ function renderCourseAttendanceTaking(course) {
 }
 
 function renderCourseGradesOverview(course) {
-  return `<div class="panel section-panel-gap course-management-panel" id="courseGradesPanel"><div class="panel-heading"><div><span class="eyebrow">Calificaciones</span><h3>Notas del curso</h3><p class="panel-caption">Registra cada evaluación cuando corresponda. Las notas vacías no bloquean el guardado y no se consideran en el promedio.</p></div></div><div class="responsive-table"><table class="data-table inline-grades-table"><thead><tr><th>Estudiante</th><th>Prueba 1</th><th>Prueba 2</th><th>Prueba 3</th><th>Examen</th><th>Promedio</th><th></th></tr></thead><tbody>${course.students.map((student) => { const grades = student.evaluaciones || {}; return `<tr data-grade-student="${escapeHTML(student.username)}"><td><div class="person-cell"><span class="avatar tiny">${escapeHTML(getInitials(student.nombre))}</span><strong>${escapeHTML(student.nombre)}</strong></div></td>${["prueba1", "prueba2", "prueba3", "examen"].map((key) => `<td><span class="grade-view">${formatGrade(grades[key])}</span><input class="inline-grade-input" data-grade="${key}" type="number" min="1" max="7" step="0.1" value="${grades[key] ?? ""}" hidden></td>`).join("")}<td><strong class="grade-emphasis grade-average">${formatGrade(student.promedio)}</strong></td><td><button type="button" class="btn-outline inline-edit-grade" data-student-username="${escapeHTML(student.username)}">Editar notas</button><button type="button" class="btn-primary compact-button inline-save-grade" data-student-username="${escapeHTML(student.username)}" hidden>Guardar</button><span class="save-feedback inline-grade-feedback"></span></td></tr>`; }).join("")}</tbody></table></div></div>`;
+  return `<div class="panel section-panel-gap course-management-panel" id="courseGradesPanel"><div class="panel-heading"><div><span class="eyebrow">Calificaciones</span><h3>Notas del curso</h3><p class="panel-caption">Registra cada evaluación cuando corresponda. Las notas vacías no bloquean el guardado y no se consideran en el promedio.</p></div></div><div class="responsive-table"><table class="data-table inline-grades-table"><thead><tr><th>Estudiante</th><th>Prueba 1</th><th>Prueba 2</th><th>Prueba 3</th><th>Examen</th><th>Promedio</th><th></th></tr></thead><tbody>${course.students.map((student) => { const grades = student.evaluaciones || {}; return `<tr data-grade-student="${escapeHTML(student.username)}"><td><div class="person-cell"><span class="avatar tiny">${escapeHTML(getInitials(student.nombre))}</span><strong>${escapeHTML(student.nombre)}</strong></div></td>${["prueba1", "prueba2", "prueba3", "examen"].map((key) => `<td><input class="inline-grade-input" data-grade="${key}" type="number" min="1" max="7" step="0.1" value="${grades[key] ?? ""}"></td>`).join("")}<td><strong class="grade-emphasis grade-average">${formatGrade(student.promedio)}</strong></td><td><button type="button" class="btn-primary compact-button inline-save-grade" data-student-username="${escapeHTML(student.username)}">Guardar</button><span class="save-feedback inline-grade-feedback"></span></td></tr>`; }).join("")}</tbody></table></div></div>`;
 }
 
 function renderCourseWarningsOverview(course) {
@@ -379,45 +379,31 @@ function renderTeacherCourseDetail(courseId) {
   };
   showCourseView(courseViewState[course.id] || "students");
 
-  document.querySelectorAll(".inline-edit-grade").forEach((button) => {
-    button.addEventListener("click", () => {
-      const row = button.closest("tr");
-      row.querySelectorAll(".inline-grade-input").forEach((input) => input.removeAttribute("hidden"));
-      row.querySelectorAll(".grade-view").forEach((view) => view.setAttribute("hidden", "hidden"));
-      button.setAttribute("hidden", "hidden");
-      row.querySelector(".inline-save-grade").removeAttribute("hidden");
-    });
-  });
-
   document.querySelectorAll(".inline-save-grade").forEach((button) => {
     button.addEventListener("click", () => {
       const row = button.closest("tr");
       const student = course.students.find((item) => item.username === button.dataset.studentUsername);
-      if (!student) return;
+      if (!row || !student) return;
       const inputs = [...row.querySelectorAll(".inline-grade-input")];
       const invalid = inputs.some((input) => input.value !== "" && (Number.isNaN(Number(input.value)) || Number(input.value) < 1 || Number(input.value) > 7));
+      const feedback = row.querySelector(".inline-grade-feedback");
       if (invalid) {
-        row.querySelector(".inline-grade-feedback").textContent = "Cada nota ingresada debe estar entre 1,0 y 7,0";
+        if (feedback) feedback.textContent = "Cada nota ingresada debe estar entre 1,0 y 7,0";
         return;
       }
-      student.evaluaciones = Object.fromEntries(inputs.map((input) => [input.dataset.grade, input.value === "" ? null : Number(input.value)]));
-      const enteredValues = inputs.map((input) => input.value === "" ? null : Number(input.value)).filter((value) => value !== null);
+      const values = inputs.map((input) => input.value === "" ? null : Number(input.value));
+      const enteredValues = values.filter((value) => value !== null);
+      student.evaluaciones = Object.fromEntries(inputs.map((input, index) => [input.dataset.grade, values[index]]));
       student.promedio = enteredValues.length ? Number((enteredValues.reduce((sum, value) => sum + value, 0) / enteredValues.length).toFixed(1)) : null;
       const lastEntered = inputs.filter((input) => input.value !== "").pop();
       student.ultimaEvaluacion = lastEntered ? lastEntered.dataset.grade : "";
       student.estado = enteredValues.length ? "Regular" : "Pendiente";
       persistDatabase(db);
-      row.querySelectorAll(".grade-view").forEach((view, index) => { view.textContent = formatGrade(student.evaluaciones[inputs[index].dataset.grade]); view.removeAttribute("hidden"); });
-      row.querySelectorAll(".inline-grade-input").forEach((input) => { input.setAttribute("hidden", "hidden"); });
-      row.querySelector(".grade-average").textContent = formatGrade(student.promedio);
-      button.setAttribute("hidden", "hidden");
-      row.querySelector(".inline-edit-grade").removeAttribute("hidden");
-      row.querySelector(".inline-grade-feedback").textContent = "Guardado";
+      courseViewState[course.id] = "grades";
+      renderTeacherCourseDetail(course.id);
       if (window.Academy7Firebase?.isAvailable?.()) {
         window.Academy7Firebase.saveStudentRecord(currentUser.username, course.id, student).catch((error) => console.warn("No se pudo guardar la nota en Firebase", error));
       }
-      refreshCourseStudentRows(course, student);
-      refreshCourseSummaryStats(course);
     });
   });
 
@@ -581,5 +567,4 @@ function renderTeacherMessages(filter = "todos") {
   });
   hydrateTeacherMessages();
 }
-
 
