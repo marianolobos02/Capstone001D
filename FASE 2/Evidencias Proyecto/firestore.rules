@@ -2,19 +2,53 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // La cuenta del portal se identifica por el correo username@academy7.cl.
-    // Por ejemplo, asilva accede a teachers/asilva.
-    match /teachers/{teacherId}/courses/{courseId}/{document=**} {
-      allow read, write: if request.auth != null
-        && request.auth.token.email == teacherId + '@academy7.cl';
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isTeacher(String teacherId) {
+      return signedIn() && request.auth.token.email == teacherId + '@academy7.cl';
+    }
+
+    // Cada usuario puede consultar su perfil. La carga administrativa se hace
+    // con Firebase Admin SDK, nunca con una clave privada en el navegador.
+    match /users/{username} {
+      allow read: if signedIn() && request.auth.token.email == username + '@academy7.cl';
+      allow write: if false;
+    }
+
+    match /students/{username} {
+      allow read: if signedIn() && request.auth.token.email == username + '@academy7.cl';
+      allow write: if false;
+    }
+
+    match /guardians/{username} {
+      allow read: if signedIn() && request.auth.token.email == username + '@academy7.cl';
+      allow write: if false;
+    }
+
+    // Las cuentas autenticadas pueden consultar cursos y estudiantes para
+    // construir sus paneles. Solo el docente dueño puede modificar registros.
+    match /teachers/{teacherId}/courses/{courseId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isTeacher(teacherId);
+
+      match /students/{studentId} {
+        allow read: if signedIn();
+        allow create, update, delete: if isTeacher(teacherId);
+      }
+
+      match /attendance/{sessionId} {
+        allow read: if signedIn();
+        allow create, update, delete: if isTeacher(teacherId);
+      }
     }
 
     match /teachers/{teacherId}/messages/{messageId} {
-      allow read, write: if request.auth != null
-        && request.auth.token.email == teacherId + '@academy7.cl';
+      allow read: if signedIn();
+      allow create, update, delete: if isTeacher(teacherId);
     }
 
-    // Denegar todo lo demás por defecto.
     match /{document=**} {
       allow read, write: if false;
     }
