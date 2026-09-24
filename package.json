@@ -1,16 +1,5 @@
 {
   "dependencies": {
-    "firebase": "^12.19.0",
-    "firebase-admin": "^14.5.0"
-  },
-  "name": "capstone001d",
-  "version": "1.0.0",
-  "description": "Proyecto final de capstone",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+    "firebase": "^12.19.0"
+  }
 }
