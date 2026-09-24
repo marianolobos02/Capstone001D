@@ -183,7 +183,10 @@ function refreshCourseStudentRows(course, student) {
   if (gradesRow) {
     const grades = student.evaluaciones || {};
     const cells = gradesRow.querySelectorAll("td");
-    ["prueba1", "prueba2", "prueba3", "examen"].forEach((key, index) => { if (cells[index + 1]) cells[index + 1].textContent = formatGrade(grades[key]); });
+    ["prueba1", "prueba2", "prueba3", "examen"].forEach((key, index) => {
+      const input = cells[index + 1]?.querySelector(".inline-grade-input");
+      if (input) input.value = grades[key] ?? "";
+    });
     if (cells[5]) cells[5].innerHTML = `<strong class="grade-emphasis">${formatGrade(student.promedio)}</strong>`;
   }
   const warningsRow = findRow("#courseWarningsPanel .warning-student-open")?.closest("tr");
@@ -567,4 +570,3 @@ function renderTeacherMessages(filter = "todos") {
   });
   hydrateTeacherMessages();
 }
-
