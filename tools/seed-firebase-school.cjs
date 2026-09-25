@@ -24,20 +24,22 @@ const auth = getAuth();
 const db = getFirestore();
 
 const GENERATED_PASSWORD = "Academy2026!";
-const firstNames = ["Agustina", "Alejandro", "Antonia", "Benjamín", "Camila", "Catalina", "Constanza", "Daniela", "Diego", "Emilia", "Felipe", "Fernanda", "Florencia", "Gabriel", "Ignacia", "Javiera", "Joaquín", "José", "Josefa", "Juan", "Laura", "Leonardo", "Lucas", "Lucía", "Martina", "Matías", "Maximiliano", "Nicolás", "Pablo", "Renata", "Rodrigo", "Samuel", "Santiago", "Sofía", "Tomás", "Valentina", "Vicente"];
-const lastNames = ["Araya", "Bravo", "Cáceres", "Contreras", "Díaz", "Espinoza", "Fuentes", "Garrido", "Gómez", "González", "Herrera", "Leiva", "Maldonado", "Martínez", "Muñoz", "Navarro", "Ortega", "Paredes", "Pérez", "Ramírez", "Reyes", "Rojas", "Sanhueza", "Sepúlveda", "Soto", "Torres", "Valdés", "Vargas", "Vera", "Zúñiga"];
+const firstNames = ["Agustina", "Alejandro", "Antonia", "Benjamín", "Camila", "Catalina", "Constanza", "Daniela", "Diego", "Emilia", "Felipe", "Fernanda", "Florencia", "Gabriel", "Ignacia", "Javiera", "Joaquín", "José", "Josefa", "Juan", "Laura", "Leonardo", "Lucas", "Lucía", "Matías", "Maximiliano", "Martina", "Nicolás", "Pablo", "Renata", "Rodrigo", "Samuel", "Santiago", "Sofía", "Tomás", "Valentina", "Vicente"];
+const middleNames = ["Antonia", "Andrés", "Belén", "Camilo", "Carolina", "Cristóbal", "Daniel", "Elena", "Esperanza", "Felipe", "Ignacio", "Isidora", "Javier", "José", "Josefina", "Manuel", "María", "Paz", "Sebastián", "Vicente"];
+const lastNames = ["Araya", "Bravo", "Bustos", "Cáceres", "Carrasco", "Castillo", "Contreras", "Cornejo", "Díaz", "Donoso", "Espinoza", "Fernández", "Figueroa", "Fuentes", "Gallardo", "Garrido", "Gómez", "González", "Guajardo", "Herrera", "Jara", "Lagos", "Leiva", "Maldonado", "Martínez", "Méndez", "Muñoz", "Navarro", "Núñez", "Ortega", "Paredes", "Pavez", "Pérez", "Poblete", "Ramírez", "Reyes", "Riquelme", "Rojas", "Salazar", "Sanhueza", "Sepúlveda", "Soto", "Tapia", "Toledo", "Torres", "Valdés", "Vargas", "Vega", "Vera", "Zúñiga"];
+const secondLastNames = ["Aravena", "Baeza", "Barra", "Bernales", "Cabrera", "Campos", "Cárdenas", "Cisternas", "Escobar", "Gutiérrez", "Hernández", "Inostroza", "Jara", "Lara", "Lillo", "López", "Mora", "Morales", "Orellana", "Parra", "Pino", "Quintana", "Rivera", "Rodríguez", "Romero", "Saavedra", "Sáez", "Serrano", "Silva", "Vásquez"];
 const teacherNames = ["Andrea Silva", "Ricardo Peña", "Camila Torres", "Marco Iturra", "Laura Bennett", "Diego Fuentes", "Paula Díaz", "Tomás Vera", "Elisa Muñoz", "Nicolás Reyes", "Sofía León", "Carolina Vidal"];
 const subjects = ["Matemática", "Lengua y Literatura", "Ciencias Naturales", "Historia, Geografía y Cs. Sociales", "Inglés", "Educación Física"];
 const levels = [];
 for (let i = 1; i <= 8; i++) levels.push({ label: `${i}° Básico`, slug: `${i}basico`, letters: ["A", "B", "C", "D"] });
 for (let i = 1; i <= 4; i++) levels.push({ label: `${i}° Medio`, slug: `${i}medio`, letters: ["A", "B", "C"] });
 const legacy = new Map([
-  ["mrojas", ["María Fernanda Rojas", "4° Medio A"]], ["jgomez", ["Joaquín Gómez", "3° Medio B"]], ["lgonzalez", ["Lucía González", "8° Básico A"]],
-  ["pmartinez", ["Pablo Martínez", "4° Medio A"]], ["asoto", ["Antonia Soto", "4° Medio A"]], ["dcastro", ["Diego Castro", "4° Medio A"]]
+  ["mrojas", ["María Fernanda Rojas González", "4° Medio A"]], ["jgomez", ["Joaquín Ignacio Gómez Pérez", "3° Medio B"]], ["lgonzalez", ["Lucía Valentina González Araya", "8° Básico A"]],
+  ["pmartinez", ["Pablo Andrés Martínez Soto", "4° Medio A"]], ["asoto", ["Antonia Belén Soto Fuentes", "4° Medio A"]], ["dcastro", ["Diego Alejandro Castro Reyes", "4° Medio A"]]
 ]);
 function slug(value) { return String(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24); }
 function initials(name) { return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase(); }
-function nameAt(index) { return `${firstNames[index % firstNames.length]} ${lastNames[Math.floor(index / firstNames.length) % lastNames.length]}`; }
+function nameAt(index) { return `${firstNames[index % firstNames.length]} ${middleNames[(index * 3) % middleNames.length]} ${lastNames[(index * 7) % lastNames.length]} ${secondLastNames[(index * 11) % secondLastNames.length]}`; }
 function email(username) { return `${username}@academy7.cl`; }
 async function createOrUpdateUser(account) {
   let record;
@@ -49,6 +51,7 @@ async function main() {
   const accounts = [];
   const courses = [];
   const guardians = [];
+  const usedStudentNames = new Set([...legacy.values()].map(([nombre]) => nombre));
   const studentUsernames = [];
   const teacherUsernames = teacherNames.map((name, index) => index === 0 ? "asilva" : `docente${String(index + 1).padStart(2, "0")}`);
   teacherNames.forEach((nombre, index) => accounts.push({ username: teacherUsernames[index], password: index === 0 ? "colegio2024" : GENERATED_PASSWORD, nombre, rol: "Docente", email: email(teacherUsernames[index]) }));
@@ -62,14 +65,16 @@ async function main() {
     for (const [username, [nombre]] of special) {
       courseStudents.push({ username, nombre, password: "colegio2024", email: email(username), rol: "Estudiante", curso: `${level.label} ${letter}`, nivel: level.label });
       studentUsernames.push(username);
+      studentIndex += 1;
     }
     const targetSize = 30 + (courseIndex % 7);
     while (courseStudents.length < targetSize) {
-      const username = `est${String(studentIndex + 1).padStart(4, "0")}`;
-      const nombre = nameAt(studentIndex);
+      let nombre;
+      do { nombre = nameAt(studentIndex); studentIndex += 1; } while (usedStudentNames.has(nombre));
+      usedStudentNames.add(nombre);
+      const username = `est${String(studentIndex).padStart(4, "0")}`;
       courseStudents.push({ username, nombre, password: GENERATED_PASSWORD, email: email(username), rol: "Estudiante", curso: `${level.label} ${letter}`, nivel: level.label });
       studentUsernames.push(username);
-      studentIndex += 1;
     }
     courses.push({ id: courseId, teacherUsername, nombre: subjects[courseIndex % subjects.length], curso: `${level.label} ${letter}`, sala: `Sala ${(courseIndex % 20) + 1}`, horario: "Lun / Mié / Vie · 08:00", periodo: "Año escolar 2026", students: courseStudents });
     courseIndex += 1;
