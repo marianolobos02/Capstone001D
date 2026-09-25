@@ -242,6 +242,68 @@ function renderSchedule(schedule, compact = false) {
   `;
 }
 
+function renderTeacherCourseSchedules(courses) {
+  if (!courses.length) return `<div class="empty-state"><div class="glyph">·</div>No hay clases asignadas.</div>`;
+  return `
+    <div class="teacher-course-schedule-grid">
+      ${courses.map((course) => `
+        <article class="teacher-course-schedule-card">
+          <div class="teacher-course-schedule-head">
+            <div>
+              <span class="course-kicker">Clase asignada</span>
+              <h4>${escapeHTML(course.nombre)}</h4>
+              <p>${escapeHTML(course.curso)} · ${escapeHTML(course.sala)}</p>
+            </div>
+            <span class="teacher-course-schedule-icon">${escapeHTML(getInitials(course.curso))}</span>
+          </div>
+          <div class="teacher-course-session-list">
+            ${(course.horarioDetalle || []).map((session) => `
+              <div class="teacher-course-session">
+                <strong>${escapeHTML(session.dia)}</strong>
+                <span>${escapeHTML(session.hora)}</span>
+              </div>
+            `).join("") || `<div class="teacher-course-session"><strong>Horario semanal</strong><span>${escapeHTML(course.horario || "Pendiente de asignación")}</span></div>`}
+          </div>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
+function formatSchoolCalendarDate(isoDate) {
+  if (!isoDate) return "";
+  const date = new Date(`${isoDate}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? isoDate : new Intl.DateTimeFormat("es-CL", { day: "numeric", month: "short", year: "numeric" }).format(date);
+}
+
+function renderTeacherEvaluationCalendar(events, schoolCalendar = {}) {
+  const bySemester = [1, 2].map((semester) => ({
+    semester,
+    events: events.filter((event) => Number(event.semestre) === semester)
+  }));
+  const courseCount = new Set(events.map((event) => event.courseId)).size;
+  const semestersHTML = bySemester.map(({ semester, events: semesterEvents }) => `
+    <section class="evaluation-semester">
+      <div class="evaluation-semester-heading"><span>Semestre ${semester}</span><small>${semesterEvents.length} evaluaciones</small></div>
+      <div class="calendar-list full-calendar-list teacher-evaluation-list">
+        ${semesterEvents.map((event) => `
+          <div class="cal-row teacher-evaluation-row">
+            <div class="cal-date"><div class="day">${escapeHTML(event.dia)}</div><div class="mon">${escapeHTML(event.mes)}</div></div>
+            <div class="cal-info"><span class="course-kicker">${escapeHTML(event.curso || "Evaluación")}</span><h4>${escapeHTML(event.titulo)}</h4><p>${escapeHTML(event.detalle)}</p></div>
+          </div>
+        `).join("") || `<div class="empty-state compact-empty">No hay evaluaciones en este semestre.</div>`}
+      </div>
+    </section>
+  `).join("");
+  return `
+    <div class="evaluation-calendar-note">
+      <span class="evaluation-calendar-mark">✓</span>
+      <div><strong>Plan de evaluaciones · Año escolar ${escapeHTML(schoolCalendar.year || 2026)}</strong><p>Clases: ${escapeHTML(formatSchoolCalendarDate(schoolCalendar.startDate) || "02 mar")} a ${escapeHTML(formatSchoolCalendarDate(schoolCalendar.endDate) || "18 dic")} (lunes a viernes) · 4° Medio hasta ${escapeHTML(formatSchoolCalendarDate(schoolCalendar.fourthMediumEnd) || "06 nov")} · ${courseCount} curso(s) · tres pruebas normales y una global de ponderación doble por semestre${events.some((event) => event.evaluacionTipo === "examenFinal") ? "; enseñanza media suma examen final al cierre del segundo semestre" : ""}.</p></div>
+    </div>
+    ${semestersHTML || `<div class="empty-state"><div class="glyph">·</div>No hay evaluaciones programadas.</div>`}
+  `;
+}
+
 function renderChildPicker(children) {
   if (children.length <= 1) return "";
   return `
@@ -280,5 +342,3 @@ function renderInicio() {
   if (roleKey === "apoderado") return renderGuardianHome();
   return renderStudentHome();
 }
-
-

@@ -163,8 +163,31 @@ function renderCourseAttendanceTaking(course) {
   `;
 }
 
+function getCourseAssessmentDefinitions(course) {
+  const assessments = [];
+  [1, 2].forEach((semester) => {
+    assessments.push(
+      { key: `s${semester}_prueba1`, label: `Prueba 1 · S${semester}`, weight: 1 },
+      { key: `s${semester}_prueba2`, label: `Prueba 2 · S${semester}`, weight: 1 },
+      { key: `s${semester}_prueba3`, label: `Prueba 3 · S${semester}`, weight: 1 },
+      { key: `s${semester}_global`, label: `Global · S${semester} (×2)`, weight: 2 }
+    );
+  });
+  if (/^[1-4]° Medio\b/.test(course.curso)) assessments.push({ key: "examenFinal", label: "Examen final", weight: 1 });
+  return assessments;
+}
+
+function calculateCourseGradeAverage(evaluations, definitions) {
+  const graded = definitions.filter((item) => evaluations[item.key] !== null && evaluations[item.key] !== undefined && evaluations[item.key] !== "");
+  if (!graded.length) return null;
+  const weightedTotal = graded.reduce((sum, item) => sum + Number(evaluations[item.key]) * item.weight, 0);
+  const totalWeight = graded.reduce((sum, item) => sum + item.weight, 0);
+  return Number((weightedTotal / totalWeight).toFixed(1));
+}
+
 function renderCourseGradesOverview(course) {
-  return `<div class="panel section-panel-gap course-management-panel" id="courseGradesPanel"><div class="panel-heading"><div><span class="eyebrow">Calificaciones</span><h3>Notas del curso</h3><p class="panel-caption">Registra cada evaluación cuando corresponda. Las notas vacías no bloquean el guardado y no se consideran en el promedio.</p></div></div><div class="responsive-table"><table class="data-table inline-grades-table"><thead><tr><th>Estudiante</th><th>Prueba 1</th><th>Prueba 2</th><th>Prueba 3</th><th>Examen</th><th>Promedio</th><th></th></tr></thead><tbody>${course.students.map((student) => { const grades = student.evaluaciones || {}; return `<tr data-grade-student="${escapeHTML(student.username)}"><td><div class="person-cell"><span class="avatar tiny">${escapeHTML(getInitials(student.nombre))}</span><strong>${escapeHTML(student.nombre)}</strong></div></td>${["prueba1", "prueba2", "prueba3", "examen"].map((key) => `<td><input class="inline-grade-input" data-grade="${key}" type="number" min="1" max="7" step="0.1" value="${grades[key] ?? ""}"></td>`).join("")}<td><strong class="grade-emphasis grade-average">${formatGrade(student.promedio)}</strong></td><td><button type="button" class="btn-primary compact-button inline-save-grade" data-student-username="${escapeHTML(student.username)}">Guardar</button><span class="save-feedback inline-grade-feedback"></span></td></tr>`; }).join("")}</tbody></table></div></div>`;
+  const assessments = getCourseAssessmentDefinitions(course);
+  return `<div class="panel section-panel-gap course-management-panel" id="courseGradesPanel"><div class="panel-heading"><div><span class="eyebrow">Calificaciones</span><h3>Notas del curso</h3><p class="panel-caption">Cada semestre contempla 3 pruebas normales y una global con ponderación doble.${assessments.some((item) => item.key === "examenFinal") ? " Se agrega el examen final al cierre de 4° Medio." : ""} Las evaluaciones vacías no se consideran en el promedio.</p></div></div><div class="responsive-table"><table class="data-table inline-grades-table"><thead><tr><th>Estudiante</th>${assessments.map((item) => `<th>${escapeHTML(item.label)}</th>`).join("")}<th>Promedio ponderado</th><th></th></tr></thead><tbody>${course.students.map((student) => { const grades = student.evaluaciones || {}; return `<tr data-grade-student="${escapeHTML(student.username)}"><td><div class="person-cell"><span class="avatar tiny">${escapeHTML(getInitials(student.nombre))}</span><strong>${escapeHTML(student.nombre)}</strong></div></td>${assessments.map((item) => `<td><input class="inline-grade-input" data-grade="${item.key}" aria-label="${escapeHTML(item.label)}" type="number" min="1" max="7" step="0.1" value="${grades[item.key] ?? ""}"></td>`).join("")}<td><strong class="grade-emphasis grade-average">${formatGrade(student.promedio)}</strong></td><td><button type="button" class="btn-primary compact-button inline-save-grade" data-student-username="${escapeHTML(student.username)}">Guardar</button><span class="save-feedback inline-grade-feedback"></span></td></tr>`; }).join("")}</tbody></table></div></div>`;
 }
 
 function renderCourseWarningsOverview(course) {
@@ -182,12 +205,9 @@ function refreshCourseStudentRows(course, student) {
   const gradesRow = document.querySelector(`#courseGradesPanel tr[data-grade-student="${CSS.escape(student.username)}"]`);
   if (gradesRow) {
     const grades = student.evaluaciones || {};
+    gradesRow.querySelectorAll(".inline-grade-input").forEach((input) => { input.value = grades[input.dataset.grade] ?? ""; });
     const cells = gradesRow.querySelectorAll("td");
-    ["prueba1", "prueba2", "prueba3", "examen"].forEach((key, index) => {
-      const input = cells[index + 1]?.querySelector(".inline-grade-input");
-      if (input) input.value = grades[key] ?? "";
-    });
-    if (cells[5]) cells[5].innerHTML = `<strong class="grade-emphasis">${formatGrade(student.promedio)}</strong>`;
+    if (cells.length > 2) cells[cells.length - 2].innerHTML = `<strong class="grade-emphasis">${formatGrade(student.promedio)}</strong>`;
   }
   const warningsRow = findRow("#courseWarningsPanel .warning-student-open")?.closest("tr");
   if (warningsRow) {
@@ -201,12 +221,7 @@ function refreshCourseStudentRows(course, student) {
 function renderTeacherStudentDetail(course, student) {
   const evaluations = student.evaluaciones || {};
   const warnings = student.warnings || [];
-  const assessmentRows = [
-    ["Prueba 1", evaluations.prueba1],
-    ["Prueba 2", evaluations.prueba2],
-    ["Prueba 3", evaluations.prueba3],
-    ["Examen", evaluations.examen]
-  ];
+  const assessmentRows = getCourseAssessmentDefinitions(course);
 
   return `
     <div class="student-detail-header">
@@ -214,7 +229,7 @@ function renderTeacherStudentDetail(course, student) {
       <button class="text-button" id="closeStudentDetail">Cerrar detalle ×</button>
     </div>
     <div class="student-detail-grid">
-      <div class="student-detail-section"><div class="detail-section-title"><h4>Notas del curso</h4><span class="grade-emphasis">Promedio ${student.promedio === null || student.promedio === undefined ? "—" : Number(student.promedio).toFixed(1)}</span></div><form class="teacher-edit-form" id="gradesForm"><div class="manual-grade-grid">${assessmentRows.map(([label, value]) => `<label><span>${label}</span><input type="number" name="${label.toLowerCase().replace(" ", "")}" min="1" max="7" step="0.1" value="${value === null || value === undefined ? "" : Number(value).toFixed(1)}"></label>`).join("")}</div><button type="submit" class="btn-primary compact-button">Guardar notas</button><span class="save-feedback" id="gradesFeedback"></span></form></div>
+      <div class="student-detail-section"><div class="detail-section-title"><h4>Notas del curso</h4><span class="grade-emphasis">Promedio ponderado ${student.promedio === null || student.promedio === undefined ? "—" : Number(student.promedio).toFixed(1)}</span></div><form class="teacher-edit-form" id="gradesForm"><div class="manual-grade-grid">${assessmentRows.map((item) => `<label><span>${escapeHTML(item.label)}</span><input type="number" name="${item.key}" min="1" max="7" step="0.1" value="${evaluations[item.key] === null || evaluations[item.key] === undefined ? "" : Number(evaluations[item.key]).toFixed(1)}"></label>`).join("")}</div><button type="submit" class="btn-primary compact-button">Guardar notas</button><span class="save-feedback" id="gradesFeedback"></span></form></div>
       <div class="student-detail-section"><div class="detail-section-title"><h4>Asistencia en este curso</h4><strong class="detail-percent">${getStudentCourseAttendance(course, student)}%</strong></div><div class="attendance-preview">${renderProgress(getStudentCourseAttendance(course, student), `Clases asistidas en ${course.nombre}`)}</div><p class="detail-muted">Este porcentaje se calcula con las clases registradas como Presente o Justificado en este curso.</p></div>
     </div>
     <div class="student-detail-section warnings-section"><div class="detail-section-title"><h4>Amonestaciones</h4>${warnings.length ? renderPill(`${warnings.length} registro(s)`, "brick") : renderPill("Sin registros", "green")}</div><div class="student-warning-list">${warnings.map((warning, index) => `<div class="student-warning-item"><span class="warning-date">${escapeHTML(warning.fecha)}</span><div class="warning-copy"><strong>${escapeHTML(warning.tipo)}</strong><p>${escapeHTML(warning.detalle)}</p></div><div class="warning-actions"><button type="button" class="text-button edit-warning" data-warning-index="${index}">Editar</button><button type="button" class="text-button delete-warning" data-warning-index="${index}">Eliminar</button></div></div>`).join("") || `<p class="detail-muted">Este alumno no tiene amonestaciones registradas en el curso.</p>`}</div><form class="teacher-edit-form warning-form" id="warningForm"><div class="warning-form-title"><strong id="warningFormTitle">Nueva amonestación</strong><button type="button" class="text-button cancel-warning-edit" id="cancelWarningEdit" hidden>Cancelar edición</button></div><div class="warning-form-grid"><label><span>Fecha</span><input type="text" name="fecha" placeholder="ej: 15 sep 2026" required></label><label><span>Motivo / tipo</span><input type="text" name="tipo" placeholder="ej: Inasistencia" required></label><label class="warning-detail-field"><span>Detalle</span><textarea name="detalle" rows="2" placeholder="Describe el motivo de la amonestación" required></textarea></label></div><button type="submit" class="btn-primary compact-button" id="warningSubmitButton">Agregar amonestación</button><span class="save-feedback" id="warningFeedback"></span></form></div>
@@ -243,18 +258,17 @@ function bindTeacherStudentDetailActions(course, student) {
   document.getElementById("gradesForm")?.addEventListener("submit", (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const keys = ["prueba1", "prueba2", "prueba3", "examen"];
-    const labels = { prueba1: "Prueba 1", prueba2: "Prueba 2", prueba3: "Prueba 3", examen: "Examen" };
+    const assessmentDefinitions = getCourseAssessmentDefinitions(course);
     const nextEvaluations = {};
-    keys.forEach((key) => {
+    assessmentDefinitions.forEach(({ key }) => {
       const raw = String(form.get(key) || "").trim();
       if (raw !== "") nextEvaluations[key] = Number(raw);
     });
     const values = Object.values(nextEvaluations);
     if (!values.length || values.some((value) => Number.isNaN(value) || value < 1 || value > 7)) return;
     student.evaluaciones = nextEvaluations;
-    student.promedio = Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1));
-    student.ultimaEvaluacion = labels[keys.filter((key) => nextEvaluations[key] !== undefined).at(-1)];
+    student.promedio = calculateCourseGradeAverage(nextEvaluations, assessmentDefinitions);
+    student.ultimaEvaluacion = assessmentDefinitions.filter((item) => nextEvaluations[item.key] !== undefined).at(-1)?.label || "";
     persistDatabase(db);
     refreshCourseStudentRows(course, student);
     refreshDetail();
@@ -394,13 +408,12 @@ function renderTeacherCourseDetail(courseId) {
         if (feedback) feedback.textContent = "Cada nota ingresada debe estar entre 1,0 y 7,0";
         return;
       }
-      const values = inputs.map((input) => input.value === "" ? null : Number(input.value));
-      const enteredValues = values.filter((value) => value !== null);
-      student.evaluaciones = Object.fromEntries(inputs.map((input, index) => [input.dataset.grade, values[index]]));
-      student.promedio = enteredValues.length ? Number((enteredValues.reduce((sum, value) => sum + value, 0) / enteredValues.length).toFixed(1)) : null;
-      const lastEntered = inputs.filter((input) => input.value !== "").pop();
-      student.ultimaEvaluacion = lastEntered ? lastEntered.dataset.grade : "";
-      student.estado = enteredValues.length ? "Regular" : "Pendiente";
+      const nextEvaluations = Object.fromEntries(inputs.map((input) => [input.dataset.grade, input.value === "" ? null : Number(input.value)]));
+      const assessments = getCourseAssessmentDefinitions(course);
+      student.evaluaciones = nextEvaluations;
+      student.promedio = calculateCourseGradeAverage(nextEvaluations, assessments);
+      student.ultimaEvaluacion = assessments.filter((item) => nextEvaluations[item.key] !== null).at(-1)?.label || "";
+      student.estado = student.promedio === null ? "Pendiente" : "Regular";
       persistDatabase(db);
       courseViewState[course.id] = "grades";
       renderTeacherCourseDetail(course.id);

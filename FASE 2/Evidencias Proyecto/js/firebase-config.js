@@ -46,7 +46,12 @@ function teacherMessagesCollection(teacherId) {
 }
 
 function academyEmailForUsername(username) {
-  return `${String(username || "").trim().toLowerCase()}@academy7.cl`;
+  const normalized = String(username || "").trim().toLowerCase();
+  if (typeof getUserByUsername === "function") {
+    const profile = getUserByUsername(normalized);
+    if (profile?.correo) return profile.correo;
+  }
+  return `${normalized}@academy7.cl`;
 }
 
 async function signInWithFirebase(username, password) {
