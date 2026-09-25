@@ -1029,7 +1029,7 @@ button {
 
 /* ---------- Manual teacher editing controls ---------- */
 .teacher-edit-form { margin-top: 4px; }
-.manual-grade-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+.manual-grade-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 8px; margin-bottom: 14px; }
 .manual-grade-grid label, .manual-attendance-grid label, .warning-form-grid label { display: flex; flex-direction: column; gap: 5px; }
 .manual-grade-grid label > span, .manual-attendance-grid label > span, .warning-form-grid label > span { color: var(--ink-muted); font-size: 10.5px; }
 .teacher-edit-form input, .teacher-edit-form textarea { width: 100%; border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 2px; padding: 8px 9px; font-family: inherit; font-size: 12px; }
@@ -1050,7 +1050,7 @@ button {
 .warning-actions .delete-warning { color: var(--brick); }
 
 @media (max-width: 600px) {
-  .manual-grade-grid { grid-template-columns: repeat(2, 1fr); }
+  .manual-grade-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .warning-form-grid { grid-template-columns: 1fr; }
   .warning-detail-field { grid-column: auto; }
   .warning-actions { flex-direction: column; align-items: flex-end; }
@@ -1147,3 +1147,35 @@ button {
 .message-compose-form label > span { color: var(--ink-muted); font-size: 10.5px; }
 .message-compose-form input, .message-compose-form select, .message-compose-form textarea { width: 100%; border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 9px; font-family: inherit; font-size: 12px; }
 .message-compose-form input:focus, .message-compose-form select:focus, .message-compose-form textarea:focus { border-color: var(--gold); outline: none; }
+
+/* ---------- Teacher schedule and evaluation calendar ---------- */
+.teacher-course-schedule-panel { border-top: 3px solid var(--navy); }
+.teacher-course-schedule-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(245px, 1fr)); gap: 14px; }
+.teacher-course-schedule-card { background: #FBFAF6; border: 1px solid var(--line-soft); border-top: 2px solid var(--gold); padding: 17px; }
+.teacher-course-schedule-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding-bottom: 13px; border-bottom: 1px solid var(--line-soft); }
+.teacher-course-schedule-head h4 { font-family: var(--font-display); font-size: 18px; font-weight: 500; margin: 6px 0 3px; }
+.teacher-course-schedule-head p { color: var(--ink-muted); font-size: 12px; margin: 0; }
+.teacher-course-schedule-icon { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 50%; background: var(--gold-soft); color: var(--navy); font-family: var(--font-display); font-size: 12px; }
+.teacher-course-session-list { display: grid; gap: 7px; margin-top: 13px; }
+.teacher-course-session { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; background: #fff; border-left: 3px solid var(--navy); padding: 8px 10px; font-size: 12px; }
+.teacher-course-session:nth-child(2n) { border-left-color: var(--gold); }
+.teacher-course-session strong { font-weight: 600; }
+.teacher-course-session span { color: var(--gold); font-size: 11px; font-weight: 600; white-space: nowrap; }
+.evaluation-calendar-note { display: flex; align-items: center; gap: 13px; background: #EFF7F0; border-left: 3px solid var(--green); padding: 14px 16px; margin-bottom: 10px; }
+.evaluation-calendar-mark { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 50%; background: #D5E8D7; color: var(--green); font-weight: 700; }
+.evaluation-calendar-note strong { font-size: 13px; }
+.evaluation-calendar-note p { color: var(--ink-muted); font-size: 11.5px; margin: 3px 0 0; }
+.evaluation-semester { margin-top: 21px; }
+.evaluation-semester-heading { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid var(--gold-soft); padding: 0 0 9px; color: var(--navy); font-family: var(--font-display); font-size: 17px; }
+.evaluation-semester-heading small { color: var(--ink-muted); font-family: var(--font-body); font-size: 11px; }
+.evaluation-semester .teacher-evaluation-row:first-child { padding-top: 14px; }
+.teacher-evaluation-row { padding: 19px 0; }
+.teacher-evaluation-row .cal-date { border-right: 1px solid var(--line-soft); padding-right: 18px; }
+.teacher-evaluation-row .cal-info .course-kicker { display: block; margin-bottom: 5px; }
+
+@media (max-width: 600px) {
+  .teacher-course-session { grid-template-columns: 1fr; gap: 3px; }
+  .teacher-course-session span { white-space: normal; }
+  .teacher-evaluation-row .cal-date { padding-right: 10px; min-width: 49px; }
+  .evaluation-calendar-note { align-items: flex-start; }
+}

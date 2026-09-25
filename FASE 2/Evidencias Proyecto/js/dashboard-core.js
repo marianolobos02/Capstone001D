@@ -53,9 +53,24 @@ function renderCursos() {
 function renderHorario() {
   setGreeting(roleKey === "docente" ? "Horario de clases" : "Mi horario");
   if (roleKey === "docente") {
+    const courses = getTeacherCourses(currentUser.username);
+    const schedule = getTeacherSchedule(currentUser.username);
+    const classBlocks = courses.reduce((total, course) => total + (course.horarioDetalle || []).length, 0);
     content.innerHTML = `
-      ${renderSectionIntro("Agenda docente", "Horario de clases", "Tus bloques de clases, planificación y reuniones durante la semana.")}
-      <div class="panel schedule-panel">${renderSchedule(getTeacherSchedule(currentUser.username))}</div>
+      ${renderSectionIntro("Agenda docente", "Horario de clases", "Consulta cada clase que impartes y su bloque semanal, separado por curso.")}
+      <div class="detail-stat-grid three-col">
+        ${renderMiniStat(courses.length, "Clases asignadas", "gold")}
+        ${renderMiniStat(classBlocks, "Bloques semanales", "navy")}
+        ${renderMiniStat(schedule.length, "Días con clases", "green")}
+      </div>
+      <div class="panel section-panel-gap teacher-course-schedule-panel">
+        <div class="panel-heading"><div><h3>Horario por clase</h3><p class="panel-caption">Cada tarjeta corresponde a un curso que impartes.</p></div><span class="table-note">Año escolar 2026</span></div>
+        ${renderTeacherCourseSchedules(courses)}
+      </div>
+      <div class="panel section-panel-gap">
+        <div class="panel-heading"><div><h3>Resumen semanal</h3><p class="panel-caption">Vista agrupada de todos tus bloques de clases.</p></div></div>
+        <div class="schedule-panel">${renderSchedule(schedule)}</div>
+      </div>
     `;
     return;
   }
@@ -71,8 +86,8 @@ function renderCalendario() {
   let events;
   let description;
   if (roleKey === "docente") {
-    events = getTeacherEvents(currentUser.username);
-    description = "Pruebas, reuniones y compromisos de tu agenda docente.";
+    events = getTeacherEvents(currentUser.username).filter((event) => event.tipo === "evaluacion");
+    description = "Evaluaciones por semestre según el nivel del curso, dentro del calendario escolar de lunes a viernes.";
   } else {
     const child = getContextStudent();
     events = child ? getStudentEvents(child.username) : [];
@@ -81,7 +96,7 @@ function renderCalendario() {
   content.innerHTML = `
     ${renderSectionIntro(roleKey === "docente" ? "Agenda docente" : roleKey === "apoderado" ? "Agenda familiar" : "Agenda escolar", "Calendario", description)}
     ${roleKey === "apoderado" ? renderChildPicker(getStudentChildren(currentUser.username)) : ""}
-    <div class="panel"><div class="calendar-list full-calendar-list">${events.map((event) => `<div class="cal-row"><div class="cal-date"><div class="day">${escapeHTML(event.dia)}</div><div class="mon">${escapeHTML(event.mes)}</div></div><div class="cal-info"><h4>${escapeHTML(event.titulo)}</h4><p>${escapeHTML(event.detalle)}</p></div></div>`).join("") || `<div class="empty-state"><div class="glyph">·</div>No hay eventos programados.</div>`}</div></div>
+    <div class="panel">${roleKey === "docente" ? renderTeacherEvaluationCalendar(events, db.schoolCalendar) : `<div class="calendar-list full-calendar-list">${events.map((event) => `<div class="cal-row"><div class="cal-date"><div class="day">${escapeHTML(event.dia)}</div><div class="mon">${escapeHTML(event.mes)}</div></div><div class="cal-info"><h4>${escapeHTML(event.titulo)}</h4><p>${escapeHTML(event.detalle)}</p></div></div>`).join("") || `<div class="empty-state"><div class="glyph">·</div>No hay eventos programados.</div>`}</div>`}</div>
   `;
   if (roleKey === "apoderado") bindChildPicker();
 }
@@ -204,4 +219,3 @@ document.getElementById("mobileToggle").addEventListener("click", () => {
 
 initTopbar();
 goToSection("inicio");
-
