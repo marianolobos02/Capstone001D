@@ -383,6 +383,7 @@ function seedDatabase() {
     course.attendanceRecords = [];
   });
 
+  if (window.Academy7SchoolSeed) window.Academy7SchoolSeed(db);
   localStorage.setItem(DB_KEY, JSON.stringify(db));
   return db;
 }
@@ -393,6 +394,10 @@ function getDatabase() {
   try {
     const db = JSON.parse(raw);
     if (!db.users || !db.teacherCourses || !db.attendance) return seedDatabase();
+    if (db.schoolSeedVersion !== "2026-full-school-v1" && window.Academy7SchoolSeed) {
+      window.Academy7SchoolSeed(db);
+      localStorage.setItem(DB_KEY, JSON.stringify(db));
+    }
     return db;
   } catch (e) {
     return seedDatabase();

@@ -1,81 +1,29 @@
-# Estructura sugerida para Firebase / Firestore
+# Carga de cuentas Academy7 en Firebase
 
-La interfaz mantiene una copia local mediante `persistDatabase(db)` para permitir pruebas offline. El acceso al portal usa Firebase Authentication con el formato `usuario@academy7.cl`; por ejemplo, `asilva` inicia sesión con `asilva@academy7.cl`. Cuando Firebase está disponible, la asistencia, las notas y las amonestaciones del perfil Docente también se leen y escriben en Firestore.
+El archivo `js/school-seed.js` genera localmente la estructura completa del colegio para la interfaz: **44 cursos**, cursos de 1° Básico A–D a 8° Básico A–D y de 1° Medio A–C a 4° Medio A–C, entre 30 y 36 estudiantes por curso, docentes y apoderados con uno, dos o tres hijos.
 
-## Firebase Authentication
+La creación de cuentas reales de **Firebase Authentication** no se realiza desde el navegador. Para no exponer permisos administrativos, se ejecuta una sola vez el script `tools/seed-firebase-school.cjs` con Firebase Admin SDK.
 
-En Firebase Console se debe activar el proveedor **Correo electrónico/contraseña** y crear un usuario para cada cuenta del portal. Las cuentas demo esperadas son `asilva@academy7.cl`, `cfuentes@academy7.cl` y `mrojas@academy7.cl`. El formulario continúa mostrando el nombre corto (`asilva`, `cfuentes`, `mrojas`) y el adaptador convierte ese nombre al correo de Firebase antes de autenticar.
+## Procedimiento
 
-## Cursos y estudiantes
+En la consola de Firebase, entra a **Configuración del proyecto → Cuentas de servicio**, genera una clave privada y guárdala fuera de la carpeta pública del sitio con un nombre como `serviceAccountKey.json`. No la subas a GitHub.
 
-Una estructura recomendada para la cuenta docente es:
+Desde la raíz del proyecto ejecuta:
 
-```text
-teachers/{teacherId}/courses/{courseId}
-  nombre: "Matemática"
-  curso: "4° Medio A"
-  sala: "Sala 12"
-  horario: "Lun / Mié / Vie · 08:00"
-
-teachers/{teacherId}/courses/{courseId}/students/{studentId}
-  username: "mrojas"
-  nombre: "María Fernanda Rojas"
-  promedio: 6.5
-  asistencia: 96
-  asistenciaDetalle:
-    total: 110
-    attended: 106
-  evaluaciones:
-    prueba1: 6.4 # cada evaluación se guarda de manera independiente
-    prueba2: null # puede permanecer vacía hasta que se realice la prueba
-    prueba3: null
-    examen: null
-  estado: "Regular"
-  ultimaEvaluacion: "Examen"
+```bash
+npm init -y
+npm install firebase-admin
+node tools/seed-firebase-school.cjs ./serviceAccountKey.json
 ```
 
-## Asistencia por fecha y curso
+El script crea o actualiza:
 
-La toma de asistencia se guarda por fecha dentro del curso. Cada estudiante puede tener uno de estos tres estados: `presente`, `ausente` o `justificado`. Para el porcentaje, tanto `presente` como `justificado` cuentan como clase asistida.
+- Cuentas de Firebase Authentication con correo `usuario@academy7.cl`.
+- Perfiles en `users`, `students` y `guardians`.
+- Los 44 cursos bajo `teachers/{docente}/courses/{curso}`.
+- Los estudiantes de cada curso bajo `teachers/{docente}/courses/{curso}/students/{usuario}`.
+- Un archivo local `academy7-account-credentials.csv` con las credenciales iniciales.
 
-```text
-teachers/{teacherId}/courses/{courseId}/attendance/{yyyy-mm-dd}
-  fecha: "2026-09-15"
-  records:
-    studentIdA: "presente"
-    studentIdB: "ausente"
-    studentIdC: "justificado"
-```
+El archivo CSV es sensible y no debe publicarse. Las cuentas generadas utilizan inicialmente la contraseña `Academy2026!`; las tres cuentas históricas de demostración conservan `colegio2024`.
 
-El porcentaje individual que se muestra en el curso se calcula como `(presente + justificado) / total de clases registradas * 100`. **Este porcentaje depende exclusivamente de los documentos de asistencia y nunca de las calificaciones.** Las fechas de asistencia se registran de lunes a viernes; al cambiar de fecha, la interfaz carga la sesión correspondiente o inicia una sesión nueva con todos los estudiantes como `presente`.
-
-Al iniciar una fecha nueva, cada estudiante comienza como `presente` para agilizar el registro; el docente puede cambiar individualmente el estado a `ausente` o `justificado` antes de guardar.
-
-## Amonestaciones
-
-Las amonestaciones pueden mantenerse como una subcolección para permitir edición y eliminación individual:
-
-```text
-teachers/{teacherId}/courses/{courseId}/students/{studentId}/warnings/{warningId}
-  fecha: "16 sep 2026"
-  tipo: "Justificación pendiente"
-  detalle: "La justificación quedó pendiente de revisión por Inspectoría."
-  createdAt: timestamp
-  updatedAt: timestamp
-```
-
-## Flujo de sincronización
-
-Al guardar una nota, la interfaz recalcula `promedio` usando únicamente las evaluaciones que ya tienen valor; por ello se pueden registrar las pruebas en distintos momentos del semestre. Al guardar asistencia, calcula el porcentaje usando `attended / total * 100`, sin modificar ni depender de `evaluaciones`. Al agregar, editar o eliminar una amonestación, actualiza la colección de advertencias y el contador `amonestaciones` del estudiante.
-
-La integración activa utiliza `saveCourseAttendance` y `saveStudentRecord` desde `js/firebase-config.js`. Si Firestore rechaza una operación por reglas o autenticación, la interfaz conserva el cambio local y muestra un aviso. Las amonestaciones se guardan dentro del registro del estudiante; al editar o eliminar una, se vuelve a guardar el registro completo, por lo que el cambio permanece al cerrar y abrir la aplicación. Las reglas permiten que `teachers/{teacherId}` sea leído o escrito solamente por el usuario autenticado cuyo correo sea `${teacherId}@academy7.cl`.
-
-## Mensajes docente-estudiante
-
-Los mensajes se guardan en la subcolección:
-
-```text
-teachers/{teacherId}/messages/{messageId}
-```
-
-Cada documento contiene `destinatario`, `nombre`, `relacionado`, `asunto`, `fecha`, `leido`, `cuerpo` y `updatedAt`. La vista de Mensajes carga las conversaciones desde Firestore al iniciar y los mensajes enviados se guardan inmediatamente en Firestore y en el respaldo local.
+Después de la carga, publica las reglas incluidas en `firestore.rules` desde la consola de Firebase o mediante Firebase CLI. En un entorno productivo se recomienda forzar el cambio de contraseña en el primer ingreso y limitar las lecturas a los estudiantes y apoderados relacionados con cada curso.
