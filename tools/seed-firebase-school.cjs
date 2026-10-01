@@ -44,7 +44,7 @@ const legacy = new Map([
 ]);
 function slug(value) { return String(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24); }
 function initials(name) { return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase(); }
-function nameAt(index) { const masculine = index % 2 === 1; const firstPool = masculine ? masculineFirstNames : feminineFirstNames; const middlePool = masculine ? masculineMiddleNames : feminineMiddleNames; const poolIndex = Math.floor(index / 2); const firstIndex = poolIndex % firstPool.length; const middleIndex = Math.floor(poolIndex / firstPool.length) % middlePool.length; const lastIndex = (poolIndex * 17) % lastNames.length; const secondLastIndex = (poolIndex * 29) % secondLastNames.length; return `${firstPool[firstIndex]} ${middlePool[middleIndex]} ${lastNames[lastIndex]} ${secondLastNames[secondLastIndex]}`; }
+function nameAt(index) { const masculine = index % 2 === 1; const firstPool = masculine ? masculineFirstNames : feminineFirstNames; const middlePool = masculine ? masculineMiddleNames : feminineMiddleNames; const poolIndex = Math.floor(index / 2); const firstIndex = poolIndex % firstPool.length; const middleIndex = Math.floor(poolIndex / firstPool.length) % middlePool.length; const lastIndex = (index * 17) % lastNames.length; const secondLastIndex = (Math.floor(index / lastNames.length) * 7 + index * 3) % secondLastNames.length; return `${firstPool[firstIndex]} ${middlePool[middleIndex]} ${lastNames[lastIndex]} ${secondLastNames[secondLastIndex]}`; }
 function teachersForLevel(level) { const cycle = level.label.includes("Básico") && Number(level.label.match(/\d+/)[0]) <= 4 ? 0 : level.label.includes("Básico") ? 14 : 30; const subjects = subjectsForLevel(level); return Object.fromEntries(subjects.map((subject, index) => [subject, [`docente${String(cycle + index * 2 + 1).padStart(2, "0")}`, `docente${String(cycle + index * 2 + 2).padStart(2, "0")}`]])); }
 function emailForName(name, usedEmails) { const parts = String(name).trim().split(/\s+/); const clean = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, ""); const first = clean(parts[0]); const firstSurname = clean(parts[2] || parts[1]); const secondSurname = clean(parts[3]); const middle = clean(parts[1]); const base = `${first}${firstSurname}`; const candidates = [base, ...Array.from({ length: secondSurname.length }, (_, index) => `${base}${secondSurname.slice(0, index + 1)}`), ...Array.from({ length: middle.length }, (_, index) => `${base}${secondSurname}${middle.slice(0, index + 1)}`)]; const local = candidates.find((candidate) => !usedEmails?.has(`${candidate}@academy7.cl`)) || `${base}${secondSurname}${middle}${first}`; const email = `${local}@academy7.cl`; usedEmails?.add(email); return email; }
 function finalizeAccountEmails(accounts) { const clean = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, ""); const groups = new Map(); accounts.forEach((account) => { const parts = String(account.nombre || "").trim().split(/\s+/); const base = `${clean(parts[0])}${clean(parts[2] || parts[1])}`; if (!groups.has(base)) groups.set(base, []); groups.get(base).push({ account, secondSurname: clean(parts[3]), middle: clean(parts[1]) }); }); const used = new Set(); groups.forEach((group, base) => group.forEach(({ account, secondSurname, middle }) => { const prefixes = group.length === 1 ? [""] : Array.from({ length: secondSurname.length }, (_, index) => secondSurname.slice(0, index + 1)); const local = prefixes.map((prefix) => `${base}${prefix}`).concat(`${base}${secondSurname}${middle}${clean(account.nombre)}`).find((candidate) => !used.has(candidate)); used.add(local); account.email = `${local}@academy7.cl`; })); }
@@ -106,15 +106,23 @@ async function main() {
   finalizeAccountEmails(accounts);
 
   const credentials = [];
-  for (const account of accounts) {
+  console.log(`Inicio de sincronización: ${accounts.length} cuentas y ${courses.length} cursos.`);
+  console.log("[1/2] Procesando Authentication y perfiles de usuarios...");
+  for (let accountIndex = 0; accountIndex < accounts.length; accountIndex += 1) {
+    const account = accounts[accountIndex];
     const user = await createOrUpdateUser(account);
     const profile = { username: account.username, uid: user.uid, nombre: account.nombre, rol: account.rol, correo: account.email, updatedAt: FieldValue.serverTimestamp() };
     await db.collection("users").doc(account.username).set(profile, { merge: true });
     if (account.rol === "Apoderado") await db.collection("guardians").doc(account.username).set({ ...profile, children: account.children }, { merge: true });
     if (account.rol === "Estudiante") await db.collection("students").doc(account.username).set({ ...profile, curso: account.curso, nivel: account.nivel }, { merge: true });
     credentials.push(`${account.username},${account.email},${account.password},${account.rol}`);
+    if ((accountIndex + 1) % 25 === 0 || accountIndex === accounts.length - 1) {
+      console.log(`  Cuentas: ${accountIndex + 1}/${accounts.length} (${account.rol})`);
+    }
   }
-  for (const course of courses) {
+  console.log("[2/2] Procesando cursos y listas de estudiantes...");
+  for (let courseIndex = 0; courseIndex < courses.length; courseIndex += 1) {
+    const course = courses[courseIndex];
     const courseRef = db.collection("teachers").doc(course.teacherUsername).collection("courses").doc(course.id);
     await courseRef.set({ id: course.id, nombre: course.nombre, curso: course.curso, sala: course.sala, horario: course.horario, periodo: course.periodo, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
     let batch = db.batch(); let writes = 0;
@@ -124,6 +132,7 @@ async function main() {
       if (writes === 400) { await batch.commit(); batch = db.batch(); writes = 0; }
     }
     if (writes) await batch.commit();
+    console.log(`  Curso: ${courseIndex + 1}/${courses.length} · ${course.curso} · ${course.students.length} estudiantes`);
   }
   const output = path.resolve("academy7-account-credentials.csv");
   fs.writeFileSync(output, `username,email,password,rol\n${credentials.join("\n")}\n`);
