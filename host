@@ -1,0 +1,4 @@
+en terminal
+py -m http.server 8080
+en navegador
+http://localhost:8080/index.html
