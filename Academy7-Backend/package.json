@@ -1,0 +1,12 @@
+{
+  "name": "academy7-backend",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Herramientas administrativas y configuración Firebase de Academy7",
+  "scripts": {
+    "seed": "node tools/seed-firebase-school.cjs"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.0"
+  }
+}
