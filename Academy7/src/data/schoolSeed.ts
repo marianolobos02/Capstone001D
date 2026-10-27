@@ -4,16 +4,27 @@ const firstNames = ['Agustina', 'Alejandro', 'Antonia', 'Benjamín', 'Camila', '
 const middleNames = ['Andrés', 'Antonia', 'Belén', 'Camilo', 'Carolina', 'Cristóbal', 'Daniel', 'Elena', 'Felipe', 'Ignacio', 'Isidora', 'Javier', 'José', 'Josefina', 'Manuel', 'María', 'Paz', 'Sebastián', 'Vicente']
 const surnames = ['Araya', 'Bustos', 'Cáceres', 'Carrasco', 'Castillo', 'Contreras', 'Cornejo', 'Díaz', 'Espinoza', 'Fernández', 'Fuentes', 'Garrido', 'Gómez', 'González', 'Herrera', 'Jara', 'Lagos', 'Martínez', 'Méndez', 'Muñoz', 'Navarro', 'Paredes', 'Pérez', 'Poblete', 'Ramírez', 'Reyes', 'Rojas', 'Salazar', 'Soto', 'Tapia', 'Torres', 'Vargas', 'Vega', 'Vera']
 const femaleNames = new Set(['Agustina', 'Antonia', 'Camila', 'Catalina', 'Constanza', 'Daniela', 'Emilia', 'Fernanda', 'Florencia', 'Ignacia', 'Javiera', 'Josefa', 'Laura', 'Lucía', 'Martina', 'Renata', 'Sofía', 'Valentina'])
+const maleNames = new Set(['Alejandro', 'Benjamín', 'Diego', 'Felipe', 'Gabriel', 'Joaquín', 'José', 'Juan', 'Leonardo', 'Lucas', 'Matías', 'Nicolás', 'Pablo', 'Rodrigo', 'Samuel', 'Santiago', 'Tomás', 'Vicente', 'Andrés', 'Camilo', 'Cristóbal', 'Daniel', 'Ignacio', 'Javier', 'Manuel', 'Sebastián'])
+const femaleMiddleNames = ['Antonia', 'Belén', 'Carolina', 'Elena', 'Isidora', 'Josefina', 'María', 'Paz', 'Sofía', 'Valentina', 'Javiera', 'Catalina', 'Emilia', 'Fernanda']
+const maleMiddleNames = ['Andrés', 'Benjamín', 'Camilo', 'Cristóbal', 'Daniel', 'Felipe', 'Ignacio', 'Javier', 'José', 'Manuel', 'Sebastián', 'Vicente', 'Alejandro', 'Tomás', 'Matías']
 const subjects = ['Matemática', 'Lenguaje y Comunicación', 'Historia', 'Ciencias Naturales', 'Inglés', 'Educación Física', 'Artes Visuales']
 
-function alignChildSurname(childName: string, guardianName: string) {
-  const child = childName.split(/\s+/); const guardian = guardianName.split(/\s+/)
+function alignChildSurname(childName: string, guardianName: string, guardianGender?: 'female' | 'male') {
+  const child = childName.trim().split(/\s+/); const guardian = guardianName.trim().split(/\s+/)
   if (child.length < 4 || guardian.length < 3) return childName
-  const mother = femaleNames.has(guardian[0]); const first = mother ? child[2] : guardian[2]; const second = mother ? guardian[2] : child[3]
-  return `${child[0]} ${child[1]} ${first} ${second}`
+  const gender = guardianGender ?? (femaleNames.has(guardian[0]) ? 'female' : maleNames.has(guardian[0]) ? 'male' : undefined)
+  if (!gender) return childName
+  return gender === 'female' ? `${child[0]} ${child[1]} ${child[3]} ${guardian[2]}` : `${child[0]} ${child[1]} ${guardian[2]} ${child[3]}`
+}
+function alignSecondName(name: string) {
+  const parts = name.trim().split(/\s+/); const female = femaleNames.has(parts[0]); const male = maleNames.has(parts[0])
+  if (parts.length < 2 || (!female && !male)) return name
+  const pool = female ? femaleMiddleNames : maleMiddleNames
+  if ((female && !femaleNames.has(parts[1])) || (male && !maleNames.has(parts[1]))) parts[1] = pool[0]
+  return parts.join(' ')
 }
 function makeStudent(index: number, course: string, level: string): Student {
-  const first = firstNames[index % firstNames.length]; const middle = middleNames[(index * 3) % middleNames.length]
+  const first = firstNames[index % firstNames.length]; const female = femaleNames.has(first); const pool = female ? femaleMiddleNames : maleMiddleNames; const middle = pool[(index * 3) % pool.length]
   const name = `${first} ${middle} ${surnames[(index * 5) % surnames.length]} ${surnames[(index * 7 + 3) % surnames.length]}`
   return { username: `est${String(index + 1).padStart(4, '0')}`, nombre: name, curso: course, nivel: level, promedio: null, asistencia: 0, evaluaciones: { prueba1: '', prueba2: '', prueba3: '' }, warnings: [], attendance: {} }
 }
@@ -32,7 +43,7 @@ for (let level = 1; level <= 4; level += 1) for (const letter of ['A', 'B', 'C']
 
 const guardianName = 'Carolina Fernanda Fuentes Araya'
 const firstChild = allStudents[0]
-if (firstChild) firstChild.nombre = alignChildSurname(firstChild.nombre, guardianName)
+if (firstChild) firstChild.nombre = alignChildSurname(alignSecondName(firstChild.nombre), guardianName, 'female')
 
 export const users: User[] = [
   { username: 'asilva', nombre: 'Andrea Fernanda Silva Araya', rol: 'Docente' },
