@@ -6,7 +6,7 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isTeacher(String teacherId) {
+    function isTeacher(teacherId) {
       return signedIn() && request.auth.token.email == teacherId + '@academy7.cl';
     }
 

@@ -8,6 +8,7 @@ const maleNames = new Set(['Alejandro', 'Benjamín', 'Diego', 'Felipe', 'Gabriel
 const femaleMiddleNames = ['Antonia', 'Belén', 'Carolina', 'Elena', 'Isidora', 'Josefina', 'María', 'Paz', 'Sofía', 'Valentina', 'Javiera', 'Catalina', 'Emilia', 'Fernanda']
 const maleMiddleNames = ['Andrés', 'Benjamín', 'Camilo', 'Cristóbal', 'Daniel', 'Felipe', 'Ignacio', 'Javier', 'José', 'Manuel', 'Sebastián', 'Vicente', 'Alejandro', 'Tomás', 'Matías']
 const subjects = ['Matemática', 'Lenguaje y Comunicación', 'Historia', 'Ciencias Naturales', 'Inglés', 'Educación Física', 'Artes Visuales']
+export function evaluationKeysForCourse(courseLabel: string) { const semester = ['semestre1Prueba1', 'semestre1Prueba2', 'semestre1Prueba3', 'semestre1Global', 'semestre2Prueba1', 'semestre2Prueba2', 'semestre2Prueba3', 'semestre2Global']; return courseLabel.includes('Medio') ? [...semester, 'examen'] : semester }
 
 function alignChildSurname(childName: string, guardianName: string, guardianGender?: 'female' | 'male') {
   const child = childName.trim().split(/\s+/); const guardian = guardianName.trim().split(/\s+/)
@@ -26,7 +27,7 @@ function alignSecondName(name: string) {
 function makeStudent(index: number, course: string, level: string): Student {
   const first = firstNames[index % firstNames.length]; const female = femaleNames.has(first); const pool = female ? femaleMiddleNames : maleMiddleNames; const middle = pool[(index * 3) % pool.length]
   const name = `${first} ${middle} ${surnames[(index * 5) % surnames.length]} ${surnames[(index * 7 + 3) % surnames.length]}`
-  return { username: `est${String(index + 1).padStart(4, '0')}`, nombre: name, curso: course, nivel: level, promedio: null, asistencia: 0, evaluaciones: { prueba1: '', prueba2: '', prueba3: '' }, warnings: [], attendance: {} }
+  return { username: `est${String(index + 1).padStart(4, '0')}`, nombre: name, curso: course, nivel: level, promedio: null, asistencia: 0, evaluaciones: Object.fromEntries(evaluationKeysForCourse(course).map((key) => [key, ''])), warnings: [], attendance: {}, attendanceJustifications: {} }
 }
 
 const allStudents: Student[] = []

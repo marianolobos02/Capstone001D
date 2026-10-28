@@ -198,7 +198,7 @@
     db.attendance = attendance;
     db.warnings = warnings;
     db.messages = messages;
-    db.schoolSeedVersion = "2026-full-school-v6";
+    db.schoolSeedVersion = "2026-full-school-v4";
     db.accountDefaults = { generatedPassword: GENERATED_PASSWORD, note: "Cambiar las contraseñas iniciales en producción." };
     return db;
   };
