@@ -1,4 +1,7 @@
-import { getStudent, calculateAttendance, calculateAverage, users } from '../data/schoolSeed'
+import { useEffect, useState } from 'react'
+import { getStudent, calculateAttendance, calculateAverage, users, courses } from '../data/schoolSeed'
+import { listenTeacherMessages } from '../lib/firebase'
+import type { TeacherMessage } from '../lib/firebase'
 import { Stat } from './PortalLayout'
 
 export function GuardianView({ section, username }: { section: string; username: string }) {
@@ -6,6 +9,11 @@ export function GuardianView({ section, username }: { section: string; username:
   const childIds = guardian?.children ?? []
   const children = childIds.map(getStudent).filter((student): student is NonNullable<typeof student> => Boolean(student))
   const child = children[0]
+  const teacherUsername = child ? courses.find((item) => item.students.some((student) => student.username === child.username))?.teacherUsername : undefined
+  const [messages, setMessages] = useState<TeacherMessage[]>([])
+  useEffect(() => teacherUsername ? listenTeacherMessages(teacherUsername, setMessages) : undefined, [teacherUsername])
+  const visibleMessages = messages.filter((item) => item.audience === 'guardian' || item.audience === 'both').filter((item) => item.recipientUsername === username || item.recipientUsername === 'all-guardians' || item.recipientUsername === 'all-both')
+  if (section === 'Mensajes') return <section className="panel"><span className="eyebrow">Comunicaciones</span><h1>Mensajes del colegio</h1>{visibleMessages.length ? visibleMessages.slice().reverse().map((item) => <article className="message-card" key={item.id}><strong>Docente {item.senderUsername}</strong><p>{item.text}</p></article>) : <p className="muted">No hay mensajes nuevos.</p>}</section>
   if (section === 'Inicio') return <><div className="hero guardian"><div><span className="eyebrow">Seguimiento familiar</span><h1>Resumen académico de tu familia</h1><p>Consulta la información actualizada de tus hijos.</p></div></div><div className="stats"><Stat label="Hijos asociados" value={children.length} /><Stat label="Promedio" value={child ? calculateAverage(child) ?? '—' : '—'} /><Stat label="Asistencia" value={child ? `${calculateAttendance(child)}%` : '—'} /></div><section className="panel"><h3>Personas a tu cargo</h3>{children.map((student) => <div className="child-row" key={student.username}><strong>{student.nombre}</strong><span>{student.curso} · {calculateAttendance(student)}% asistencia</span></div>)}</section></>
   if (!child) return <section className="panel"><h1>Sin hijos asociados</h1><p>Solicita al colegio asociar un estudiante a tu cuenta.</p></section>
   if (section === 'Asistencia') return <section className="panel"><span className="eyebrow">Seguimiento familiar</span><h1>Asistencia</h1><div className="big-number">{calculateAttendance(child)}%</div><p>{child.nombre} · {child.curso}</p></section>
