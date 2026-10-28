@@ -12,7 +12,22 @@ export type Student = {
   evaluaciones: Record<string, number | ''>
   warnings: Warning[]
   attendance: Record<string, AttendanceStatus>
-  attendanceJustifications: Record<string, string>
 }
-export type Course = { id: string; nombre: string; curso: string; horario: string; teacherUsername: string; students: Student[] }
+export type SubjectAssignment = {
+  asignatura: string
+  teacherUsername: string
+  docente: string
+  dia: string
+  hora: string
+  sala: string
+}
+export type Course = {
+  id: string
+  nombre: string
+  curso: string
+  horario: string
+  teacherUsername: string
+  students: Student[]
+  asignaturas: SubjectAssignment[]
+}
 export type User = { username: string; nombre: string; rol: Role; curso?: string; nivel?: string; children?: string[] }
