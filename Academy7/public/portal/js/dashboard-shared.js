@@ -34,7 +34,7 @@ const ROLE_CONFIG = {
     nav: [
       ["inicio", "Inicio"],
       ["perfil", "Mi perfil"],
-      ["cursos", "Mis cursos"],
+      ["cursos", "Mis asignaturas"],
       ["horario", "Horario de clases"],
       ["calendario", "Calendario"],
       ["amonestaciones", "Amonestaciones"],
@@ -48,6 +48,8 @@ const ROLE_CONFIG = {
       ["inicio", "Inicio"],
       ["perfil", "Mi perfil"],
       ["hijos", "Mis hijos"],
+      ["cursos", "Mis asignaturas"],
+      ["horario", "Horario"],
       ["asistencia", "Asistencia"],
       ["notas", "Calificaciones"],
       ["amonestaciones", "Amonestaciones"],
@@ -60,7 +62,7 @@ const ROLE_CONFIG = {
     nav: [
       ["inicio", "Inicio"],
       ["perfil", "Mi perfil"],
-      ["cursos", "Mis cursos"],
+      ["cursos", "Mis asignaturas"],
       ["horario", "Mi horario"],
       ["calendario", "Calendario"],
       ["notas", "Calificaciones"],
