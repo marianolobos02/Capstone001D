@@ -24,7 +24,16 @@
     return String(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24);
   }
   function initials(name) { return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase(); }
-  function alignChildSurname(childName, guardianName) { const child = String(childName || "").trim().split(/\s+/); const guardian = String(guardianName || "").trim().split(/\s+/); if (child.length < 4 || guardian.length < 3) return childName; const guardianFirstSurname = guardian[2]; const guardianIsMother = feminineFirstNames.includes(guardian[0]); const firstSurname = guardianIsMother ? child[2] : guardianFirstSurname; const secondSurname = guardianIsMother ? guardianFirstSurname : child[3]; return `${child[0]} ${child[1]} ${firstSurname} ${secondSurname}`; }
+  function genderOf(name) { const value = String(name || "").normalize("NFD").replace(/[\u0300-\u036f]/g, ""); if (feminineFirstNames.includes(value)) return "female"; if (masculineFirstNames.includes(value)) return "male"; return null; }
+  function alignChildSurname(childName, guardianName, guardianGender) {
+    const child = String(childName || "").trim().split(/\s+/); const guardian = String(guardianName || "").trim().split(/\s+/);
+    if (child.length < 4 || guardian.length < 3) return childName;
+    const gender = guardianGender || genderOf(guardian[0]);
+    if (!gender) return childName;
+    const guardianSurname = guardian[2];
+    return gender === "female" ? `${child[0]} ${child[1]} ${child[3]} ${guardianSurname}` : `${child[0]} ${child[1]} ${guardianSurname} ${child[3]}`;
+  }
+  function alignSecondName(name) { const parts = String(name || "").trim().split(/\s+/); if (parts.length < 2) return name; const gender = genderOf(parts[0]); if (!gender) return name; const pool = gender === "female" ? feminineMiddleNames : masculineMiddleNames; if (genderOf(parts[1]) !== gender) parts[1] = pool[0]; return parts.join(" "); }
   function accountEmail(name, usedEmails) { const parts = String(name).trim().split(/\s+/); const clean = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, ""); const first = clean(parts[0]); const firstSurname = clean(parts[2] || parts[1]); const secondSurname = clean(parts[3]); const middle = clean(parts[1]); const base = `${first}${firstSurname}`; const candidates = [base, ...Array.from({ length: secondSurname.length }, (_, index) => `${base}${secondSurname.slice(0, index + 1)}`), ...Array.from({ length: middle.length }, (_, index) => `${base}${secondSurname}${middle.slice(0, index + 1)}`)]; const local = candidates.find((candidate) => !usedEmails?.has(`${candidate}@academy7.cl`)) || `${base}${secondSurname}${middle}${first}`; const email = `${local}@academy7.cl`; usedEmails?.add(email); return email; }
   function finalizeAccountEmails(users) { const clean = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, ""); const groups = new Map(); users.forEach((user) => { const parts = String(user.nombre || "").trim().split(/\s+/); const base = `${clean(parts[0])}${clean(parts[2] || parts[1])}`; if (!groups.has(base)) groups.set(base, []); groups.get(base).push({ user, secondSurname: clean(parts[3]), middle: clean(parts[1]) }); }); const used = new Set(); groups.forEach((group, base) => group.forEach(({ user, secondSurname, middle }) => { const prefixes = group.length === 1 ? [""] : Array.from({ length: secondSurname.length }, (_, index) => secondSurname.slice(0, index + 1)); const local = prefixes.map((prefix) => `${base}${prefix}`).concat(`${base}${secondSurname}${middle}${clean(user.nombre)}`).find((candidate) => !used.has(candidate)); used.add(local); user.correo = `${local}@academy7.cl`; })); }
   function teachersForLevel(level) { const cycle = level.label.includes("Básico") && Number(level.label.match(/\d+/)[0]) <= 4 ? 0 : level.label.includes("Básico") ? 14 : 30; const subjects = subjectsForLevel(level); return subjects.reduce((map, subject, index) => { map[subject] = [`docente${String(cycle + index * 2 + 1).padStart(2, "0")}`, `docente${String(cycle + index * 2 + 2).padStart(2, "0")}`]; return map; }, {}); }
@@ -134,14 +143,14 @@
       const children = generatedStudents.slice(i, i + count);
       if (!children.length) break;
       const username = `apoderado${String(guardianIndex).padStart(4, "0")}`;
-      const name = `${firstNames[(guardianIndex + 7) % firstNames.length]} ${middleNames[(guardianIndex + 3) % middleNames.length]} ${lastNames[(guardianIndex + 11) % lastNames.length]} ${secondLastNames[(guardianIndex + 17) % secondLastNames.length]}`;
+      const guardianFirst = firstNames[(guardianIndex + 7) % firstNames.length]; const guardianGender = genderOf(guardianFirst); const guardianMiddlePool = guardianGender === "female" ? feminineMiddleNames : masculineMiddleNames; const name = `${guardianFirst} ${guardianMiddlePool[(guardianIndex + 3) % guardianMiddlePool.length]} ${lastNames[(guardianIndex + 11) % lastNames.length]} ${secondLastNames[(guardianIndex + 17) % secondLastNames.length]}`;
       usersByUsername.set(username, { username, password: GENERATED_PASSWORD, nombre: name, rol: "Apoderado", correo: accountEmail(name, usedEmails), telefono: `+56 9 7${String(guardianIndex).padStart(7, "0")}`, iniciales: initials(name), direccion: "Santiago" });
       guardianChildren[username] = children;
       i += children.length - 1;
       guardianIndex += 1;
     }
     const demoGuardian = usersByUsername.get("cfuentes") || { username: "cfuentes", password: "colegio2024", rol: "Apoderado" };
-    Object.assign(demoGuardian, { nombre: "Carolina Fernanda Fuentes Araya", correo: accountEmail("Carolina Fernanda Fuentes Araya", usedEmails), iniciales: initials("Carolina Fernanda Fuentes Araya") });
+    Object.assign(demoGuardian, { nombre: "Carolina Fernanda Fuentes Araya", genero: "Femenino", correo: accountEmail("Carolina Fernanda Fuentes Araya", usedEmails), iniciales: initials("Carolina Fernanda Fuentes Araya") });
     usersByUsername.set("cfuentes", demoGuardian);
     guardianChildren.cfuentes = ["mrojas", "lgonzalez", "jgomez"];
     Object.entries(guardianChildren).forEach(([guardianUsername, children]) => {
@@ -150,7 +159,8 @@
       (children || []).forEach((studentUsername) => {
         const studentUser = usersByUsername.get(studentUsername);
         if (!studentUser) return;
-        const alignedName = alignChildSurname(studentUser.nombre, guardian.nombre);
+        const normalizedName = alignSecondName(studentUser.nombre);
+        const alignedName = alignChildSurname(normalizedName, guardian.nombre, guardian.genero === "Femenino" ? "female" : guardian.genero === "Masculino" ? "male" : null);
         studentUser.nombre = alignedName;
         studentUser.iniciales = initials(alignedName);
         Object.values(teacherCourses).flat().forEach((course) => {
@@ -174,7 +184,7 @@
     db.attendance = attendance;
     db.warnings = warnings;
     db.messages = messages;
-    db.schoolSeedVersion = "2026-full-school-v3";
+    db.schoolSeedVersion = "2026-full-school-v4";
     db.accountDefaults = { generatedPassword: GENERATED_PASSWORD, note: "Cambiar las contraseñas iniciales en producción." };
     return db;
   };
