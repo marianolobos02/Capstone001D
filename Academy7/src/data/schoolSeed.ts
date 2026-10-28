@@ -86,3 +86,7 @@ export function getCourseForStudent(username: string) {
 export function getStudentAssignments(username: string) { return getCourseForStudent(username)?.asignaturas ?? [] }
 export function calculateAverage(student: Student) { const values = Object.values(student.evaluaciones).filter((value): value is number => typeof value === 'number'); return values.length ? Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1)) : null }
 export function calculateAttendance(student: Student) { const values = Object.values(student.attendance); return values.length ? Math.round(values.filter((value) => value === 'Presente' || value === 'Justificado').length / values.length * 100) : 0 }
+export function evaluationKeysForCourse(course: Course): string[] {
+  const keys = Object.keys(course.students[0]?.evaluaciones ?? { prueba1: '', prueba2: '', prueba3: '' })
+  return keys.length ? keys : ['prueba1', 'prueba2', 'prueba3']
+}
