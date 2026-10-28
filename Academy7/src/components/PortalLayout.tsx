@@ -5,8 +5,8 @@ type Props = { user: User; active: string; onNavigate: (section: string) => void
 
 const menus: Record<Role, string[]> = {
   Docente: ['Inicio', 'Cursos', 'Horario', 'Calendario', 'Mensajes'],
-  Apoderado: ['Inicio', 'Mis hijos', 'Asistencia', 'Calificaciones', 'Amonestaciones', 'Calendario'],
-  Estudiante: ['Inicio', 'Mis cursos', 'Horario', 'Calendario', 'Calificaciones', 'Asistencia', 'Amonestaciones'],
+  Apoderado: ['Inicio', 'Mis hijos', 'Mis asignaturas', 'Horario', 'Asistencia', 'Calificaciones', 'Amonestaciones', 'Calendario'],
+  Estudiante: ['Inicio', 'Mis asignaturas', 'Horario', 'Calendario', 'Calificaciones', 'Asistencia', 'Amonestaciones'],
 }
 
 export function PortalLayout({ user, active, onNavigate, onLogout, children }: Props) {
