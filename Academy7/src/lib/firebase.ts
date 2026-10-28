@@ -1,6 +1,6 @@
 import { getApps, initializeApp } from 'firebase/app'
 import { getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth'
-import { collection, doc, getDocs, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore'
+import { addDoc, collection, doc, getDocs, getFirestore, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
 import type { Course, Student } from '../types'
 
 const firebaseConfig = {
@@ -51,4 +51,16 @@ export async function saveStudentToFirebase(teacherUsername: string, courseId: s
     amonestaciones: student.warnings.length,
     updatedAt: serverTimestamp(),
   }, { merge: true })
+}
+
+export type TeacherMessage = { id: string; senderUsername: string; recipientUsername?: string; audience: 'student' | 'guardian' | 'both'; text: string; createdAt?: unknown }
+
+export function listenTeacherMessages(teacherUsername: string, onMessages: (messages: TeacherMessage[]) => void) {
+  return onSnapshot(collection(firestore, 'teachers', teacherUsername, 'messages'), (snapshot) => {
+    onMessages(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as TeacherMessage)))
+  })
+}
+
+export async function sendTeacherMessage(teacherUsername: string, message: Omit<TeacherMessage, 'id' | 'createdAt' | 'senderUsername'>) {
+  await addDoc(collection(firestore, 'teachers', teacherUsername, 'messages'), { ...message, senderUsername: teacherUsername, createdAt: serverTimestamp() })
 }

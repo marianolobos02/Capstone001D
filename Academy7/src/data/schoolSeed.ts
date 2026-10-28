@@ -1,6 +1,20 @@
 import type { Course, Student, SubjectAssignment, User } from '../types'
 
 const firstNames = ['Agustina', 'Alejandro', 'Antonia', 'Benjamín', 'Camila', 'Catalina', 'Constanza', 'Daniela', 'Diego', 'Emilia', 'Felipe', 'Fernanda', 'Florencia', 'Gabriel', 'Ignacia', 'Javiera', 'Joaquín', 'Josefa', 'Juan', 'Laura', 'Leonardo', 'Lucas', 'Lucía', 'Matías', 'Martina', 'Nicolás', 'Pablo', 'Renata', 'Rodrigo', 'Samuel', 'Santiago', 'Sofía', 'Tomás', 'Valentina', 'Vicente']
+const secondNames = ['Andrés', 'Antonia', 'Belén', 'Camilo', 'Carolina', 'Cristóbal', 'Daniel', 'Elena', 'Felipe', 'Ignacio', 'Isidora', 'Javier', 'José', 'Josefina', 'Manuel', 'María', 'Paz', 'Sebastián', 'Vicente']
+const surnames = ['Araya', 'Bustos', 'Cáceres', 'Carrasco', 'Castillo', 'Contreras', 'Cornejo', 'Díaz', 'Espinoza', 'Fernández', 'Fuentes', 'Garrido', 'Gómez', 'González', 'Herrera', 'Jara', 'Lagos', 'Martínez', 'Méndez', 'Muñoz', 'Navarro', 'Paredes', 'Pérez', 'Poblete', 'Ramírez', 'Reyes', 'Rojas', 'Salazar', 'Soto', 'Tapia', 'Torres', 'Vargas', 'Vega', 'Vera']
+const femaleNames = new Set(['Agustina', 'Antonia', 'Camila', 'Catalina', 'Constanza', 'Daniela', 'Emilia', 'Fernanda', 'Florencia', 'Ignacia', 'Javiera', 'Josefa', 'Laura', 'Lucía', 'Martina', 'Renata', 'Sofía', 'Valentina'])
+const subjects = ['Matemática', 'Lenguaje y Comunicación', 'Historia', 'Ciencias Naturales', 'Inglés', 'Educación Física', 'Artes Visuales']
+export function evaluationKeysForCourse(courseLabel: string) { const semester = ['semestre1Prueba1', 'semestre1Prueba2', 'semestre1Prueba3', 'semestre1Global', 'semestre2Prueba1', 'semestre2Prueba2', 'semestre2Prueba3', 'semestre2Global']; return courseLabel.includes('Medio') ? [...semester, 'examen'] : semester }
+
+function alignChildSurname(childName: string, guardianName: string) {
+  const child = childName.split(/\s+/); const guardian = guardianName.split(/\s+/)
+  if (child.length < 4 || guardian.length < 3) return childName
+  const mother = femaleNames.has(guardian[0]); const first = mother ? child[2] : guardian[2]; const second = mother ? guardian[2] : child[3]
+  return `${child[0]} ${child[1]} ${first} ${second}`
+}
+function makeStudent(index: number, course: string, level: string): Student {
+  const first = firstNames[index % firstNames.length]; const middle = secondNames[(index * 3) % secondNames.length]
 const surnames = ['Araya', 'Bustos', 'Cáceres', 'Carrasco', 'Castillo', 'Contreras', 'Cornejo', 'Díaz', 'Espinoza', 'Fernández', 'Fuentes', 'Garrido', 'Gómez', 'González', 'Herrera', 'Jara', 'Lagos', 'Martínez', 'Méndez', 'Muñoz', 'Navarro', 'Paredes', 'Pérez', 'Poblete', 'Ramírez', 'Reyes', 'Rojas', 'Salazar', 'Soto', 'Tapia', 'Torres', 'Vargas', 'Vega', 'Vera']
 const femaleNames = new Set(['Agustina', 'Antonia', 'Camila', 'Catalina', 'Constanza', 'Daniela', 'Emilia', 'Fernanda', 'Florencia', 'Ignacia', 'Javiera', 'Josefa', 'Laura', 'Lucía', 'Martina', 'Renata', 'Sofía', 'Valentina'])
 const femaleMiddleNames = ['Antonia', 'Belén', 'Carolina', 'Elena', 'Isidora', 'Josefina', 'María', 'Paz', 'Sofía', 'Valentina', 'Javiera', 'Catalina', 'Emilia', 'Fernanda']
@@ -69,6 +83,7 @@ for (let level = 1; level <= 4; level += 1) for (const letter of ['A', 'B', 'C']
 
 const guardianName = 'Carolina Fernanda Fuentes Araya'
 const firstChild = allStudents[0]
+if (firstChild) firstChild.nombre = alignChildSurname(firstChild.nombre, guardianName)
 if (firstChild) firstChild.nombre = `${firstChild.nombre.split(/\s+/).slice(0, 2).join(' ')} ${firstChild.nombre.split(/\s+/)[3]} Fuentes`
 
 export const users: User[] = [
