@@ -466,7 +466,7 @@ function getStudentChildren(username) {
 
 function getTeacherWarnings(username) {
   const db = getDatabase();
-  return (db.teacherCourses[username] || []).flatMap((course) =>
+  return getTeacherCourses(username).flatMap((course) =>
     course.students.flatMap((student) => (student.warnings || []).map((warning) => ({
       ...warning,
       alumno: student.nombre,
@@ -498,17 +498,32 @@ function getStudentEvents(username) {
 
 function getStudentCourses(username) {
   const db = getDatabase();
-  return db.courses[username] || [];
+  const student = db.users.find((user) => user.username === username);
+  const courseKey = db.courses?.[username] || student?.curso;
+  return db.classAssignments?.[courseKey] || [];
 }
 
 function getStudentSchedule(username) {
   const db = getDatabase();
-  return db.schedules[username] || [];
+  if (db.schedules?.[username]?.length) return db.schedules[username];
+  const grouped = new Map();
+  getStudentCourses(username).forEach((subject) => {
+    const [dia, hora] = String(subject.horario || "").split(" · ");
+    if (!dia || !hora) return;
+    if (!grouped.has(dia)) grouped.set(dia, []);
+    grouped.get(dia).push({ hora, curso: subject.nombre, sala: `${subject.sala} · ${subject.profesor}` });
+  });
+  return [...grouped.entries()].map(([dia, bloques]) => ({ dia, bloques }));
 }
 
 function getTeacherCourses(username) {
   const db = getDatabase();
-  return db.teacherCourses[username] || [];
+  return (db.teacherCourses[username] || []).map((course) => ({
+    ...course,
+    students: (course.studentUsernames || course.students?.map((student) => student.username) || [])
+      .map((studentUsername) => db.users.find((user) => user.username === studentUsername))
+      .filter(Boolean)
+  }));
 }
 
 function getTeacherSchedule(username) {

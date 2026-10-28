@@ -36,7 +36,10 @@
   function alignSecondName(name) { const parts = String(name || "").trim().split(/\s+/); if (parts.length < 2) return name; const gender = genderOf(parts[0]); if (!gender) return name; const pool = gender === "female" ? feminineMiddleNames : masculineMiddleNames; if (genderOf(parts[1]) !== gender) parts[1] = pool[0]; return parts.join(" "); }
   function accountEmail(name, usedEmails) { const parts = String(name).trim().split(/\s+/); const clean = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, ""); const first = clean(parts[0]); const firstSurname = clean(parts[2] || parts[1]); const secondSurname = clean(parts[3]); const middle = clean(parts[1]); const base = `${first}${firstSurname}`; const candidates = [base, ...Array.from({ length: secondSurname.length }, (_, index) => `${base}${secondSurname.slice(0, index + 1)}`), ...Array.from({ length: middle.length }, (_, index) => `${base}${secondSurname}${middle.slice(0, index + 1)}`)]; const local = candidates.find((candidate) => !usedEmails?.has(`${candidate}@academy7.cl`)) || `${base}${secondSurname}${middle}${first}`; const email = `${local}@academy7.cl`; usedEmails?.add(email); return email; }
   function finalizeAccountEmails(users) { const clean = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, ""); const groups = new Map(); users.forEach((user) => { const parts = String(user.nombre || "").trim().split(/\s+/); const base = `${clean(parts[0])}${clean(parts[2] || parts[1])}`; if (!groups.has(base)) groups.set(base, []); groups.get(base).push({ user, secondSurname: clean(parts[3]), middle: clean(parts[1]) }); }); const used = new Set(); groups.forEach((group, base) => group.forEach(({ user, secondSurname, middle }) => { const prefixes = group.length === 1 ? [""] : Array.from({ length: secondSurname.length }, (_, index) => secondSurname.slice(0, index + 1)); const local = prefixes.map((prefix) => `${base}${prefix}`).concat(`${base}${secondSurname}${middle}${clean(user.nombre)}`).find((candidate) => !used.has(candidate)); used.add(local); user.correo = `${local}@academy7.cl`; })); }
-  function teachersForLevel(level) { const cycle = level.label.includes("Básico") && Number(level.label.match(/\d+/)[0]) <= 4 ? 0 : level.label.includes("Básico") ? 14 : 30; const subjects = subjectsForLevel(level); return subjects.reduce((map, subject, index) => { map[subject] = [`docente${String(cycle + index * 2 + 1).padStart(2, "0")}`, `docente${String(cycle + index * 2 + 2).padStart(2, "0")}`]; return map; }, {}); }
+  function teacherUsername(index) { return index === 1 ? "asilva" : `docente${String(index).padStart(2, "0")}`; }
+  function teachersForLevel(level) { const cycle = level.label.includes("Básico") && Number(level.label.match(/\d+/)[0]) <= 4 ? 0 : level.label.includes("Básico") ? 14 : 30; const subjects = subjectsForLevel(level); return subjects.reduce((map, subject, index) => { map[subject] = [teacherUsername(cycle + index * 2 + 1), teacherUsername(cycle + index * 2 + 2)]; return map; }, {}); }
+  const WEEK_DAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
+  const WEEK_SLOTS = [["08:00", "09:30"], ["09:45", "11:15"], ["11:30", "13:00"], ["14:00", "15:30"]];
   function studentName(index) { const masculine = index % 2 === 1; const firstPool = masculine ? masculineFirstNames : feminineFirstNames; const middlePool = masculine ? masculineMiddleNames : feminineMiddleNames; const poolIndex = Math.floor(index / 2); const firstIndex = poolIndex % firstPool.length; const middleIndex = Math.floor(poolIndex / firstPool.length) % middlePool.length; const lastIndex = (index * 17) % lastNames.length; const secondLastIndex = (Math.floor(index / lastNames.length) * 7 + index * 3) % secondLastNames.length; return `${firstPool[firstIndex]} ${middlePool[middleIndex]} ${lastNames[lastIndex]} ${secondLastNames[secondLastIndex]}`; }
   function makeCourse(id, level, letter, teacherUsername, students) {
     const subject = subjects[id.length % subjects.length];
@@ -54,6 +57,7 @@
     const teacherMessages = {};
     const guardianChildren = { ...(db.guardianChildren || {}) };
     const coursesByStudent = {};
+    const classAssignments = {};
     const schedules = {};
     const calendar = {};
     const grades = {};
@@ -113,19 +117,28 @@
         allStudentUsernames.push(username);
       }
       const course = makeCourse(`curso-${sectionKey}`, level, letter, assignedTeacher, roster);
+      const teachersBySubject = teachersForLevel(level);
       course.nombre = courseSubject;
       course.asignaturas = cycleSubjects;
-      course.nombre = courseSubject;
-      course.asignaturas = cycleSubjects;
-      course.nombre = courseSubject;
-      course.asignaturas = cycleSubjects;
-      course.docentesPorAsignatura = teachersForLevel(level);
-      teacherCourses[assignedTeacher].push(course);
-      coursesByStudent[roster[0].username] = coursesByStudent[roster[0].username] || [];
+      course.docentesPorAsignatura = teachersBySubject;
+      course.horarioDetalle = [];
+      const classIndex = letter.charCodeAt(0) - 65;
+      const subjectPlans = cycleSubjects.map((subject, subjectIndex) => {
+        const assignedUsername = teachersBySubject[subject][classIndex % teachersBySubject[subject].length];
+        const teacher = usersByUsername.get(assignedUsername);
+        const day = WEEK_DAYS[subjectIndex % WEEK_DAYS.length];
+        const slot = WEEK_SLOTS[Math.floor(subjectIndex / WEEK_DAYS.length) % WEEK_SLOTS.length];
+        const room = subject === "Educación Física" ? "Gimnasio" : `Sala ${1 + ((subjectIndex + classIndex) % 5)}`;
+        const plan = { nombre: subject, profesor: `Prof. ${teacher?.nombre || "Docente por asignar"}`, teacherUsername: assignedUsername, sala: room, dia: day, hora: `${slot[0]}–${slot[1]}` };
+        course.horarioDetalle.push({ dia: day, hora: plan.hora, sala: room, nombre: subject, profesor: plan.profesor });
+        return plan;
+      });
+      classAssignments[courseLabel] = subjectPlans.map(({ nombre, profesor, sala, dia, hora }) => ({ nombre, profesor, sala, horario: `${dia} · ${hora}` }));
+      const teacherCourse = { ...course, studentUsernames: roster.map((student) => student.username) };
+      delete teacherCourse.students;
+      teacherCourses[assignedTeacher].push(teacherCourse);
       roster.forEach((student) => {
-        coursesByStudent[student.username] = coursesByStudent[student.username] || [];
-        coursesByStudent[student.username].push({ nombre: course.nombre, profesor: `Prof. ${usersByUsername.get(assignedTeacher).nombre}`, sala: course.sala, horario: course.horario });
-        schedules[student.username] = schedules[student.username] || [];
+        coursesByStudent[student.username] = courseLabel;
         calendar[student.username] = calendar[student.username] || [];
         grades[student.username] = grades[student.username] || [];
         attendance[student.username] = attendance[student.username] || { percent: 0, total: 0, attended: 0, absences: 0, late: 0, byCourse: [] };
@@ -164,7 +177,7 @@
         studentUser.nombre = alignedName;
         studentUser.iniciales = initials(alignedName);
         Object.values(teacherCourses).flat().forEach((course) => {
-          const rosterStudent = course.students.find((student) => student.username === studentUsername);
+          const rosterStudent = course.students?.find((student) => student.username === studentUsername);
           if (rosterStudent) rosterStudent.nombre = alignedName;
         });
       });
@@ -178,6 +191,7 @@
     db.teacherMessages = teacherMessages;
     db.guardianChildren = guardianChildren;
     db.courses = coursesByStudent;
+    db.classAssignments = classAssignments;
     db.schedules = schedules;
     db.calendar = calendar;
     db.grades = grades;

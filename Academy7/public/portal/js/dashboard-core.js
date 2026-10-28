@@ -32,10 +32,12 @@ function renderPerfil() {
 
 function renderCursos() {
   if (roleKey === "docente") return renderTeacherCourses();
-  setGreeting("Mis cursos");
-  const courses = getStudentCourses(currentUser.username);
+  setGreeting("Mis asignaturas");
+  const student = getContextStudent();
+  const courses = student ? getStudentCourses(student.username) : [];
   content.innerHTML = `
-    ${renderSectionIntro("Año escolar 2026", "Mis cursos", `Asignaturas registradas en ${escapeHTML(currentUser.nivel)} · ${escapeHTML(currentUser.curso)}.`)}
+    ${roleKey === "apoderado" ? renderChildPicker(getStudentChildren(currentUser.username)) : ""}
+    ${renderSectionIntro(roleKey === "apoderado" ? "Seguimiento familiar" : "Año escolar 2026", "Mis asignaturas", `Asignaturas de ${escapeHTML(student?.nombre || "el estudiante")} · ${escapeHTML(student?.curso || "")}.`)}
     <div class="course-grid">
       ${courses.map((course) => `
         <div class="course-card student-course-card">
@@ -47,6 +49,7 @@ function renderCursos() {
       `).join("")}
     </div>
   `;
+  if (roleKey === "apoderado") bindChildPicker();
 }
 
 
@@ -74,11 +77,14 @@ function renderHorario() {
     `;
     return;
   }
-  const username = currentUser.username;
+  const student = getContextStudent();
+  const username = student?.username;
   content.innerHTML = `
-    ${renderSectionIntro("Año escolar 2026", "Mi horario", `Horario semanal de ${escapeHTML(currentUser.curso)} · ${escapeHTML(currentUser.nivel)}.`)}
-    <div class="panel schedule-panel">${renderSchedule(getStudentSchedule(username))}</div>
+    ${roleKey === "apoderado" ? renderChildPicker(getStudentChildren(currentUser.username)) : ""}
+    ${renderSectionIntro(roleKey === "apoderado" ? "Seguimiento familiar" : "Año escolar 2026", roleKey === "apoderado" ? "Horario del estudiante" : "Mi horario", `Horario semanal de ${escapeHTML(student?.nombre || "el estudiante")} · ${escapeHTML(student?.curso || "")}.`)}
+    <div class="panel schedule-panel">${username ? renderSchedule(getStudentSchedule(username)) : `<div class="empty-state">No hay un estudiante asociado a la cuenta.</div>`}</div>
   `;
+  if (roleKey === "apoderado") bindChildPicker();
 }
 
 function renderCalendario() {
