@@ -12,6 +12,7 @@ export type Student = {
   evaluaciones: Record<string, number | ''>
   warnings: Warning[]
   attendance: Record<string, AttendanceStatus>
+  attendanceJustifications: Record<string, string>
 }
 export type SubjectAssignment = {
   asignatura: string

@@ -117,6 +117,7 @@ async function main() {
   for (let accountIndex = 0; accountIndex < accounts.length; accountIndex += 1) {
     const account = accounts[accountIndex];
     const user = await createOrUpdateUser(account);
+    await auth.setCustomUserClaims(user.uid, { username: account.username, role: account.rol });
     const profile = { username: account.username, uid: user.uid, nombre: account.nombre, rol: account.rol, correo: account.email, updatedAt: FieldValue.serverTimestamp() };
     await db.collection("users").doc(account.username).set(profile, { merge: true });
     if (account.rol === "Apoderado") await db.collection("guardians").doc(account.username).set({ ...profile, children: account.children }, { merge: true });

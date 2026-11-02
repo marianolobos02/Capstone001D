@@ -1,10 +1,8 @@
 import type { Course, Student, SubjectAssignment, User } from '../types'
 
 const firstNames = ['Agustina', 'Alejandro', 'Antonia', 'Benjamín', 'Camila', 'Catalina', 'Constanza', 'Daniela', 'Diego', 'Emilia', 'Felipe', 'Fernanda', 'Florencia', 'Gabriel', 'Ignacia', 'Javiera', 'Joaquín', 'Josefa', 'Juan', 'Laura', 'Leonardo', 'Lucas', 'Lucía', 'Matías', 'Martina', 'Nicolás', 'Pablo', 'Renata', 'Rodrigo', 'Samuel', 'Santiago', 'Sofía', 'Tomás', 'Valentina', 'Vicente']
-const secondNames = ['Andrés', 'Antonia', 'Belén', 'Camilo', 'Carolina', 'Cristóbal', 'Daniel', 'Elena', 'Felipe', 'Ignacio', 'Isidora', 'Javier', 'José', 'Josefina', 'Manuel', 'María', 'Paz', 'Sebastián', 'Vicente']
 const surnames = ['Araya', 'Bustos', 'Cáceres', 'Carrasco', 'Castillo', 'Contreras', 'Cornejo', 'Díaz', 'Espinoza', 'Fernández', 'Fuentes', 'Garrido', 'Gómez', 'González', 'Herrera', 'Jara', 'Lagos', 'Martínez', 'Méndez', 'Muñoz', 'Navarro', 'Paredes', 'Pérez', 'Poblete', 'Ramírez', 'Reyes', 'Rojas', 'Salazar', 'Soto', 'Tapia', 'Torres', 'Vargas', 'Vega', 'Vera']
 const femaleNames = new Set(['Agustina', 'Antonia', 'Camila', 'Catalina', 'Constanza', 'Daniela', 'Emilia', 'Fernanda', 'Florencia', 'Ignacia', 'Javiera', 'Josefa', 'Laura', 'Lucía', 'Martina', 'Renata', 'Sofía', 'Valentina'])
-const subjects = ['Matemática', 'Lenguaje y Comunicación', 'Historia', 'Ciencias Naturales', 'Inglés', 'Educación Física', 'Artes Visuales']
 export function evaluationKeysForCourse(courseLabel: string) { const semester = ['semestre1Prueba1', 'semestre1Prueba2', 'semestre1Prueba3', 'semestre1Global', 'semestre2Prueba1', 'semestre2Prueba2', 'semestre2Prueba3', 'semestre2Global']; return courseLabel.includes('Medio') ? [...semester, 'examen'] : semester }
 
 function alignChildSurname(childName: string, guardianName: string) {
@@ -13,29 +11,11 @@ function alignChildSurname(childName: string, guardianName: string) {
   const mother = femaleNames.has(guardian[0]); const first = mother ? child[2] : guardian[2]; const second = mother ? guardian[2] : child[3]
   return `${child[0]} ${child[1]} ${first} ${second}`
 }
-function makeStudent(index: number, course: string, level: string): Student {
-  const first = firstNames[index % firstNames.length]; const middle = secondNames[(index * 3) % secondNames.length]
-const surnames = ['Araya', 'Bustos', 'Cáceres', 'Carrasco', 'Castillo', 'Contreras', 'Cornejo', 'Díaz', 'Espinoza', 'Fernández', 'Fuentes', 'Garrido', 'Gómez', 'González', 'Herrera', 'Jara', 'Lagos', 'Martínez', 'Méndez', 'Muñoz', 'Navarro', 'Paredes', 'Pérez', 'Poblete', 'Ramírez', 'Reyes', 'Rojas', 'Salazar', 'Soto', 'Tapia', 'Torres', 'Vargas', 'Vega', 'Vera']
-const femaleNames = new Set(['Agustina', 'Antonia', 'Camila', 'Catalina', 'Constanza', 'Daniela', 'Emilia', 'Fernanda', 'Florencia', 'Ignacia', 'Javiera', 'Josefa', 'Laura', 'Lucía', 'Martina', 'Renata', 'Sofía', 'Valentina'])
 const femaleMiddleNames = ['Antonia', 'Belén', 'Carolina', 'Elena', 'Isidora', 'Josefina', 'María', 'Paz', 'Sofía', 'Valentina', 'Javiera', 'Catalina', 'Emilia', 'Fernanda']
 const maleMiddleNames = ['Andrés', 'Benjamín', 'Camilo', 'Cristóbal', 'Daniel', 'Felipe', 'Ignacio', 'Javier', 'José', 'Manuel', 'Sebastián', 'Vicente', 'Alejandro', 'Tomás', 'Matías']
-const teacherNames = [
-  'Andrea Fernanda Silva Araya', 'Ricardo Andrés Peña Muñoz', 'Camila Belén Torres Rojas', 'Marco Antonio Iturra Soto',
-  'Laura Sofía Bennett Jara', 'Diego Alejandro Fuentes Vera', 'Paula Carolina Díaz Lagos', 'Tomás Ignacio Vera Paredes',
-  'Elisa María Muñoz Reyes', 'Nicolás Javier Reyes Silva', 'Sofía Valentina León Morales', 'Carolina Paz Vidal Aravena',
-  'Felipe Andrés Contreras Soto', 'Javiera Belén González Rojas', 'Matías Ignacio Herrera Díaz', 'Daniela Fernanda Paredes Lara',
-  'Gabriel Antonio Espinoza Campos', 'Constanza María Sepúlveda Vera', 'Sebastián José Castillo Pérez', 'Antonia Paz Fuentes Araya',
-  'Rodrigo Andrés Martínez Silva', 'Fernanda Carolina Riquelme Soto', 'Joaquín Manuel Salazar Reyes', 'Valentina Sofía Navarro Díaz',
-  'Esteban Felipe Carrasco Muñoz', 'Isidora Belén Vargas Rojas', 'Cristóbal Andrés Poblete Jara', 'Renata María Ortega Vera',
-  'Manuel Alejandro Tapia Lagos', 'Josefina Paz Cornejo Silva', 'Samuel Ignacio Gallardo Paredes', 'Catalina Fernanda Leiva Morales',
-  'Ignacio José Bustos Araya', 'Florencia Belén Maldonado Soto', 'Benjamín Andrés Ramírez Reyes', 'María José Figueroa Díaz',
-  'Vicente Tomás Garrido Lara', 'Agustina Sofía Donoso Muñoz', 'Alejandro Javier Cisternas Rojas', 'Emilia Paz Valdés Vera',
-  'Juan Pablo Vega Aravena', 'Martina Carolina Sanhueza Silva', 'Lucas Andrés Toledo Campos', 'Daniela Paz Núñez Reyes',
-  'Maximiliano José Vargas Soto', 'Gabriela Fernanda Herrera Lagos', 'Pablo Ignacio Pavez Morales', 'Trinidad María Escobar Riquelme',
-]
+const teacherNames = ['Andrea Fernanda Silva Araya', 'Ricardo Andrés Peña Muñoz', 'Camila Belén Torres Rojas', 'Marco Antonio Iturra Soto', 'Laura Sofía Bennett Jara', 'Diego Alejandro Fuentes Vera', 'Paula Carolina Díaz Lagos', 'Tomás Ignacio Vera Paredes', 'Elisa María Muñoz Reyes', 'Nicolás Javier Reyes Silva', 'Sofía Valentina León Morales', 'Carolina Paz Vidal Aravena', 'Felipe Andrés Contreras Soto', 'Javiera Belén González Rojas', 'Matías Ignacio Herrera Díaz', 'Daniela Fernanda Paredes Lara', 'Gabriel Antonio Espinoza Campos', 'Constanza María Sepúlveda Vera', 'Sebastián José Castillo Pérez', 'Antonia Paz Fuentes Araya', 'Rodrigo Andrés Martínez Silva', 'Fernanda Carolina Riquelme Soto', 'Joaquín Manuel Salazar Reyes', 'Valentina Sofía Navarro Díaz', 'Esteban Felipe Carrasco Muñoz', 'Isidora Belén Vargas Rojas', 'Cristóbal Andrés Poblete Jara', 'Renata María Ortega Vera', 'Manuel Alejandro Tapia Lagos', 'Josefina Paz Cornejo Silva', 'Samuel Ignacio Gallardo Paredes', 'Catalina Fernanda Leiva Morales', 'Ignacio José Bustos Araya', 'Florencia Belén Maldonado Soto', 'Benjamín Andrés Ramírez Reyes', 'María José Figueroa Díaz', 'Vicente Tomás Garrido Lara', 'Agustina Sofía Donoso Muñoz', 'Alejandro Javier Cisternas Rojas', 'Emilia Paz Valdés Vera', 'Juan Pablo Vega Aravena', 'Martina Carolina Sanhueza Silva', 'Lucas Andrés Toledo Campos', 'Daniela Paz Núñez Reyes', 'Maximiliano José Vargas Soto', 'Gabriela Fernanda Herrera Lagos', 'Pablo Ignacio Pavez Morales', 'Trinidad María Escobar Riquelme']
 const weekdays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
 const timeSlots = ['08:00–09:30', '09:45–11:15', '11:30–13:00', '14:00–15:30']
-
 function subjectsForLevel(level: number, medium = false) {
   if (medium) return ['Matemática', 'Lenguaje', 'Historia', 'Filosofía', 'Inglés', 'Ciencias', 'Educación Física', 'Geometría', 'Música']
   if (level <= 4) return ['Matemática', 'Lenguaje y Comunicación', 'Ciencias Naturales', 'Historia', 'Inglés', 'Educación Física', 'Artes Visuales']
@@ -60,7 +40,7 @@ function makeStudent(index: number, course: string, level: string): Student {
   const pool = female ? femaleMiddleNames : maleMiddleNames
   const middle = pool[(index * 3) % pool.length]
   const name = `${first} ${middle} ${surnames[(index * 5) % surnames.length]} ${surnames[(index * 7 + 3) % surnames.length]}`
-  return { username: `est${String(index + 1).padStart(4, '0')}`, nombre: name, curso: course, nivel: level, promedio: null, asistencia: 0, evaluaciones: { prueba1: '', prueba2: '', prueba3: '' }, warnings: [], attendance: {} }
+  return { username: `est${String(index + 1).padStart(4, '0')}`, nombre: name, curso: course, nivel: level, promedio: null, asistencia: 0, evaluaciones: { prueba1: '', prueba2: '', prueba3: '' }, warnings: [], attendance: {}, attendanceJustifications: {} }
 }
 
 const allStudents: Student[] = []
@@ -101,7 +81,3 @@ export function getCourseForStudent(username: string) {
 export function getStudentAssignments(username: string) { return getCourseForStudent(username)?.asignaturas ?? [] }
 export function calculateAverage(student: Student) { const values = Object.values(student.evaluaciones).filter((value): value is number => typeof value === 'number'); return values.length ? Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1)) : null }
 export function calculateAttendance(student: Student) { const values = Object.values(student.attendance); return values.length ? Math.round(values.filter((value) => value === 'Presente' || value === 'Justificado').length / values.length * 100) : 0 }
-export function evaluationKeysForCourse(course: Course): string[] {
-  const keys = Object.keys(course.students[0]?.evaluaciones ?? { prueba1: '', prueba2: '', prueba3: '' })
-  return keys.length ? keys : ['prueba1', 'prueba2', 'prueba3']
-}
