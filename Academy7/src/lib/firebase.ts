@@ -18,22 +18,27 @@ export const firebaseAuth = getAuth(app)
 export const firestore = getFirestore(app)
 
 export async function signIn(username: string, password: string) {
-  const credential = await signInWithEmailAndPassword(firebaseAuth, `${username}@academy7.cl`, password)
+  const emailAliases: Record<string, string> = { asilva: 'andreasilva' }
+  const normalizedUsername = username.trim().toLowerCase()
+  const emailUsername = emailAliases[normalizedUsername] ?? normalizedUsername
+  const email = emailUsername.includes('@') ? emailUsername : `${emailUsername}@academy7.cl`
+  const credential = await signInWithEmailAndPassword(firebaseAuth, email, password)
   return credential.user
 }
 
 export async function signOutUser() { await signOut(firebaseAuth) }
 
 export async function loadAuthenticatedProfile(username: string): Promise<User> {
-  const profileSnapshot = await getDoc(doc(firestore, 'users', username))
+  const profileId = username.trim().toLowerCase().split('@')[0]
+  const profileSnapshot = await getDoc(doc(firestore, 'users', profileId))
   if (!profileSnapshot.exists()) throw new Error('Perfil no encontrado')
   const profile = profileSnapshot.data() as User
   if (profile.rol === 'Apoderado') {
-    const guardianSnapshot = await getDoc(doc(firestore, 'guardians', username))
+    const guardianSnapshot = await getDoc(doc(firestore, 'guardians', profileId))
     return { ...profile, ...(guardianSnapshot.exists() ? guardianSnapshot.data() : {}) } as User
   }
   if (profile.rol === 'Estudiante') {
-    const studentSnapshot = await getDoc(doc(firestore, 'students', username))
+    const studentSnapshot = await getDoc(doc(firestore, 'students', profileId))
     return { ...profile, ...(studentSnapshot.exists() ? studentSnapshot.data() : {}) } as User
   }
   return profile

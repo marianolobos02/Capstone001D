@@ -120,8 +120,12 @@ async function main() {
     await auth.setCustomUserClaims(user.uid, { username: account.username, role: account.rol });
     const profile = { username: account.username, uid: user.uid, nombre: account.nombre, rol: account.rol, correo: account.email, updatedAt: FieldValue.serverTimestamp() };
     await db.collection("users").doc(account.username).set(profile, { merge: true });
+    const emailUsername = account.email.split("@")[0];
+    if (emailUsername !== account.username) await db.collection("users").doc(emailUsername).set(profile, { merge: true });
     if (account.rol === "Apoderado") await db.collection("guardians").doc(account.username).set({ ...profile, children: account.children }, { merge: true });
+    if (account.rol === "Apoderado" && emailUsername !== account.username) await db.collection("guardians").doc(emailUsername).set({ ...profile, children: account.children }, { merge: true });
     if (account.rol === "Estudiante") await db.collection("students").doc(account.username).set({ ...profile, curso: account.curso, nivel: account.nivel }, { merge: true });
+    if (account.rol === "Estudiante" && emailUsername !== account.username) await db.collection("students").doc(emailUsername).set({ ...profile, curso: account.curso, nivel: account.nivel }, { merge: true });
     credentials.push(`${account.username},${account.email},${account.password},${account.rol}`);
     if ((accountIndex + 1) % 25 === 0 || accountIndex === accounts.length - 1) {
       console.log(`  Cuentas: ${accountIndex + 1}/${accounts.length} (${account.rol})`);
