@@ -20,7 +20,11 @@ export const firestore = getFirestore(app)
 export async function signIn(username: string, password: string) {
   const emailAliases: Record<string, string> = { asilva: 'andreasilva' }
   const normalizedUsername = username.trim().toLowerCase()
-  const emailUsername = emailAliases[normalizedUsername] ?? normalizedUsername
+  let emailUsername = emailAliases[normalizedUsername] ?? normalizedUsername
+  if (!emailUsername.includes('@')) {
+    const aliasSnapshot = await getDoc(doc(firestore, 'loginAliases', normalizedUsername))
+    if (aliasSnapshot.exists()) emailUsername = String(aliasSnapshot.data().email ?? emailUsername)
+  }
   const email = emailUsername.includes('@') ? emailUsername : `${emailUsername}@academy7.cl`
   const credential = await signInWithEmailAndPassword(firebaseAuth, email, password)
   return credential.user

@@ -119,6 +119,7 @@ async function main() {
     const user = await createOrUpdateUser(account);
     await auth.setCustomUserClaims(user.uid, { username: account.username, role: account.rol });
     const profile = { username: account.username, uid: user.uid, nombre: account.nombre, rol: account.rol, correo: account.email, updatedAt: FieldValue.serverTimestamp() };
+    await db.collection("loginAliases").doc(account.username).set({ username: account.username, email: account.email, rol: account.rol }, { merge: true });
     await db.collection("users").doc(account.username).set(profile, { merge: true });
     const emailUsername = account.email.split("@")[0];
     if (emailUsername !== account.username) await db.collection("users").doc(emailUsername).set(profile, { merge: true });

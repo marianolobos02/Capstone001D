@@ -12,6 +12,7 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/guardians/$(username())).data.children.hasAny([studentId]);
     }
     match /users/{userId} { allow read: if isSelf(userId); allow write: if false; }
+    match /loginAliases/{userId} { allow read: if true; allow write: if false; }
     match /students/{studentId} { allow read: if isSelf(studentId) || isGuardianOf(studentId); allow write: if false; }
     match /guardians/{guardianId} { allow read: if isSelf(guardianId); allow write: if false; }
     match /teachers/{teacherId}/courses/{courseId} {
