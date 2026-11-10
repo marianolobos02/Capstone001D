@@ -2,55 +2,34 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() {
-      return request.auth != null;
+    function signedIn() { return request.auth != null; }
+    function username() { return request.auth.token.username; }
+    function hasRole(role) { return signedIn() && request.auth.token.role == role; }
+    function isSelf(userId) { return signedIn() && username() == userId; }
+    function isTeacher(teacherId) { return hasRole('Docente') && username() == teacherId; }
+    function isGuardianOf(studentId) {
+      return hasRole('Apoderado')
+        && get(/databases/$(database)/documents/guardians/$(username())).data.children.hasAny([studentId]);
     }
-
-    function isTeacher(teacherId) {
-      return signedIn() && request.auth.token.email == teacherId + '@academy7.cl';
-    }
-
-    // Cada usuario puede consultar su perfil. La carga administrativa se hace
-    // con Firebase Admin SDK, nunca con una clave privada en el navegador.
-    match /users/{username} {
-      allow read: if signedIn() && request.auth.token.email == username + '@academy7.cl';
-      allow write: if false;
-    }
-
-    match /students/{username} {
-      allow read: if signedIn() && request.auth.token.email == username + '@academy7.cl';
-      allow write: if false;
-    }
-
-    match /guardians/{username} {
-      allow read: if signedIn() && request.auth.token.email == username + '@academy7.cl';
-      allow write: if false;
-    }
-
-    // Las cuentas autenticadas pueden consultar cursos y estudiantes para
-    // construir sus paneles. Solo el docente dueño puede modificar registros.
+    match /users/{userId} { allow read: if isSelf(userId); allow write: if false; }
+    match /loginAliases/{userId} { allow read: if true; allow write: if false; }
+    match /students/{studentId} { allow read: if isSelf(studentId) || isGuardianOf(studentId); allow write: if false; }
+    match /guardians/{guardianId} { allow read: if isSelf(guardianId); allow write: if false; }
     match /teachers/{teacherId}/courses/{courseId} {
-      allow read: if signedIn();
+      allow read: if isTeacher(teacherId);
       allow create, update, delete: if isTeacher(teacherId);
-
       match /students/{studentId} {
-        allow read: if signedIn();
+        allow read: if isTeacher(teacherId) || isSelf(studentId) || isGuardianOf(studentId);
         allow create, update, delete: if isTeacher(teacherId);
       }
-
-      match /attendance/{sessionId} {
-        allow read: if signedIn();
-        allow create, update, delete: if isTeacher(teacherId);
-      }
+      match /attendance/{sessionId} { allow read, write: if isTeacher(teacherId); }
     }
-
     match /teachers/{teacherId}/messages/{messageId} {
-      allow read: if signedIn();
       allow create, update, delete: if isTeacher(teacherId);
+      allow read: if isTeacher(teacherId)
+        || (hasRole('Estudiante') && (resource.data.audience == 'student' || resource.data.audience == 'both') && (resource.data.recipientUsername == username() || resource.data.recipientUsername == 'all-students' || resource.data.recipientUsername == 'all-both'))
+        || (hasRole('Apoderado') && (resource.data.audience == 'guardian' || resource.data.audience == 'both') && (resource.data.recipientUsername == username() || resource.data.recipientUsername == 'all-guardians' || resource.data.recipientUsername == 'all-both'));
     }
-
-    match /{document=**} {
-      allow read, write: if false;
-    }
+    match /{document=**} { allow read, write: if false; }
   }
 }

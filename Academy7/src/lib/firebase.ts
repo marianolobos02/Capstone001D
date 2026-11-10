@@ -1,7 +1,7 @@
 import { getApps, initializeApp } from 'firebase/app'
 import { getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth'
-import { addDoc, collection, doc, getDocs, getFirestore, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
-import type { Course, Student } from '../types'
+import { addDoc, collection, doc, getDoc, getDocs, getFirestore, onSnapshot, query, serverTimestamp, setDoc, where } from 'firebase/firestore'
+import type { Course, Student, User } from '../types'
 
 const firebaseConfig = {
   apiKey: 'AIzaSyCPMkIFZ0mloz5lHUdUx5w4UaOYD6wta0w',
@@ -18,11 +18,35 @@ export const firebaseAuth = getAuth(app)
 export const firestore = getFirestore(app)
 
 export async function signIn(username: string, password: string) {
-  const credential = await signInWithEmailAndPassword(firebaseAuth, `${username}@academy7.cl`, password)
+  const emailAliases: Record<string, string> = { asilva: 'andreasilva' }
+  const normalizedUsername = username.trim().toLowerCase()
+  let emailUsername = emailAliases[normalizedUsername] ?? normalizedUsername
+  if (!emailUsername.includes('@')) {
+    const aliasSnapshot = await getDoc(doc(firestore, 'loginAliases', normalizedUsername))
+    if (aliasSnapshot.exists()) emailUsername = String(aliasSnapshot.data().email ?? emailUsername)
+  }
+  const email = emailUsername.includes('@') ? emailUsername : `${emailUsername}@academy7.cl`
+  const credential = await signInWithEmailAndPassword(firebaseAuth, email, password)
   return credential.user
 }
 
 export async function signOutUser() { await signOut(firebaseAuth) }
+
+export async function loadAuthenticatedProfile(username: string): Promise<User> {
+  const profileId = username.trim().toLowerCase().split('@')[0]
+  const profileSnapshot = await getDoc(doc(firestore, 'users', profileId))
+  if (!profileSnapshot.exists()) throw new Error('Perfil no encontrado')
+  const profile = profileSnapshot.data() as User
+  if (profile.rol === 'Apoderado') {
+    const guardianSnapshot = await getDoc(doc(firestore, 'guardians', profileId))
+    return { ...profile, ...(guardianSnapshot.exists() ? guardianSnapshot.data() : {}) } as User
+  }
+  if (profile.rol === 'Estudiante') {
+    const studentSnapshot = await getDoc(doc(firestore, 'students', profileId))
+    return { ...profile, ...(studentSnapshot.exists() ? studentSnapshot.data() : {}) } as User
+  }
+  return profile
+}
 
 function studentPath(teacherUsername: string, courseId: string, studentUsername: string) {
   return doc(firestore, 'teachers', teacherUsername, 'courses', courseId, 'students', studentUsername)
@@ -55,8 +79,14 @@ export async function saveStudentToFirebase(teacherUsername: string, courseId: s
 
 export type TeacherMessage = { id: string; senderUsername: string; recipientUsername?: string; audience: 'student' | 'guardian' | 'both'; text: string; createdAt?: unknown }
 
-export function listenTeacherMessages(teacherUsername: string, onMessages: (messages: TeacherMessage[]) => void) {
-  return onSnapshot(collection(firestore, 'teachers', teacherUsername, 'messages'), (snapshot) => {
+export function listenTeacherMessages(teacherUsername: string, onMessages: (messages: TeacherMessage[]) => void, viewer?: { username: string; role: 'Estudiante' | 'Apoderado' | 'Docente' }) {
+  const messages = collection(firestore, 'teachers', teacherUsername, 'messages')
+  const source = viewer?.role === 'Estudiante'
+    ? query(messages, where('recipientUsername', 'in', [viewer.username, 'all-students', 'all-both']), where('audience', 'in', ['student', 'both']))
+    : viewer?.role === 'Apoderado'
+      ? query(messages, where('recipientUsername', 'in', [viewer.username, 'all-guardians', 'all-both']), where('audience', 'in', ['guardian', 'both']))
+      : messages
+  return onSnapshot(source, (snapshot) => {
     onMessages(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as TeacherMessage)))
   })
 }
