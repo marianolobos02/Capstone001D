@@ -44,7 +44,7 @@ const legacy = new Map([
 ]);
 function slug(value) { return String(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24); }
 function initials(name) { return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase(); }
-function alignChildSurname(childName, guardianName) { const child = String(childName || "").trim().split(/\s+/); const guardian = String(guardianName || "").trim().split(/\s+/); if (child.length < 4 || guardian.length < 3) return childName; const guardianFirstSurname = guardian[2]; const guardianIsMother = feminineFirstNames.includes(guardian[0]); const firstSurname = guardianIsMother ? child[2] : guardianFirstSurname; const secondSurname = guardianIsMother ? guardianFirstSurname : child[3]; return `${child[0]} ${child[1]} ${firstSurname} ${secondSurname}`; }
+function alignChildSurname(childName, guardianName) { const child = String(childName || "").trim().split(/\s+/); const guardian = String(guardianName || "").trim().split(/\s+/); if (child.length < 4 || guardian.length < 4) return childName; const guardianIsMother = feminineFirstNames.includes(guardian[0]); const firstSurname = guardianIsMother ? child[2] : guardian[2]; const secondSurname = guardianIsMother ? guardian[3] : child[3]; return `${child[0]} ${child[1]} ${firstSurname} ${secondSurname}`; }
 function nameAt(index) { const masculine = index % 2 === 1; const firstPool = masculine ? masculineFirstNames : feminineFirstNames; const middlePool = masculine ? masculineMiddleNames : feminineMiddleNames; const poolIndex = Math.floor(index / 2); const firstIndex = poolIndex % firstPool.length; const middleIndex = Math.floor(poolIndex / firstPool.length) % middlePool.length; const lastIndex = (index * 17) % lastNames.length; const secondLastIndex = (Math.floor(index / lastNames.length) * 7 + index * 3) % secondLastNames.length; return `${firstPool[firstIndex]} ${middlePool[middleIndex]} ${lastNames[lastIndex]} ${secondLastNames[secondLastIndex]}`; }
 function teachersForLevel(level) { const cycle = level.label.includes("Básico") && Number(level.label.match(/\d+/)[0]) <= 4 ? 0 : level.label.includes("Básico") ? 14 : 30; const subjects = subjectsForLevel(level); return Object.fromEntries(subjects.map((subject, index) => [subject, [`docente${String(cycle + index * 2 + 1).padStart(2, "0")}`, `docente${String(cycle + index * 2 + 2).padStart(2, "0")}`]])); }
 function emailForName(name, usedEmails) { const parts = String(name).trim().split(/\s+/); const clean = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, ""); const first = clean(parts[0]); const firstSurname = clean(parts[2] || parts[1]); const secondSurname = clean(parts[3]); const middle = clean(parts[1]); const base = `${first}${firstSurname}`; const candidates = [base, ...Array.from({ length: secondSurname.length }, (_, index) => `${base}${secondSurname.slice(0, index + 1)}`), ...Array.from({ length: middle.length }, (_, index) => `${base}${secondSurname}${middle.slice(0, index + 1)}`)]; const local = candidates.find((candidate) => !usedEmails?.has(`${candidate}@academy7.cl`)) || `${base}${secondSurname}${middle}${first}`; const email = `${local}@academy7.cl`; usedEmails?.add(email); return email; }
@@ -54,6 +54,38 @@ async function createOrUpdateUser(account) {
   try { record = await auth.getUserByEmail(account.email); } catch (error) { if (error.code !== "auth/user-not-found") throw error; }
   if (record) return auth.updateUser(record.uid, { password: account.password, displayName: account.nombre });
   return auth.createUser({ email: account.email, password: account.password, displayName: account.nombre });
+}
+const schoolDays = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
+const schoolSlots = ["08:00–08:40", "08:40–09:20", "09:20–10:00", "10:00–10:40", "10:50–11:30", "11:30–12:10", "12:10–12:50", "13:00–13:40", "13:40–14:20", "14:20–15:00", "15:10–15:50", "15:50–16:30", "16:30–17:10", "17:10–17:50"];
+function buildSchedules(courses) {
+  const teacherBusy = new Map();
+  courses.forEach((course, courseIndex) => {
+    const courseBusy = new Set();
+    course.asignaturas = course.asignaturas.map((subject, subjectIndex) => {
+      const teacherList = course.docentesPorAsignatura?.[subject] ?? [];
+      const teacherUsername = teacherList[(courseIndex + subjectIndex) % Math.max(teacherList.length, 1)] ?? course.teacherUsername;
+      let chosen = null;
+      for (let offset = 0; offset < schoolDays.length * schoolSlots.length; offset += 1) {
+        const slotIndex = (courseIndex * 3 + subjectIndex * 5 + offset) % schoolSlots.length;
+        const dayIndex = Math.floor((courseIndex * 2 + subjectIndex + offset) / schoolSlots.length) % schoolDays.length;
+        const key = `${schoolDays[dayIndex]}|${schoolSlots[slotIndex]}`;
+        const teacherKeys = teacherBusy.get(teacherUsername) ?? new Set();
+        if (!courseBusy.has(key) && !teacherKeys.has(key)) { chosen = { dayIndex, slotIndex, key, teacherKeys }; break; }
+      }
+      const selected = chosen ?? { dayIndex: subjectIndex % schoolDays.length, slotIndex: subjectIndex % schoolSlots.length, key: `${schoolDays[subjectIndex % schoolDays.length]}|${schoolSlots[subjectIndex % schoolSlots.length]}`, teacherKeys: teacherBusy.get(teacherUsername) ?? new Set() };
+      selected.teacherKeys.add(selected.key); teacherBusy.set(teacherUsername, selected.teacherKeys); courseBusy.add(selected.key);
+      return { asignatura: subject, teacherUsername, docente: teacherNames[teacherUsername === "asilva" ? 0 : Math.max(0, Number(String(teacherUsername).replace("docente", "")) - 1)] ?? teacherUsername, dia: schoolDays[selected.dayIndex], hora: schoolSlots[selected.slotIndex], sala: subject === "Educación Física" ? "Gimnasio" : course.sala };
+    });
+    course.horario = "Lunes a viernes · 08:00–17:50 · bloques de 40 minutos · recreos de 10 minutos";
+    course.teacherUsername = course.asignaturas[0]?.teacherUsername ?? course.teacherUsername;
+  });
+  return courses;
+}
+function renameAccountsToEmailUsernames(accounts, courses, guardians) {
+  const mapping = new Map(accounts.map((account) => [account.username, account.email.split("@")[0]]));
+  accounts.forEach((account) => { account.username = mapping.get(account.username) ?? account.username; });
+  courses.forEach((course) => { course.teacherUsername = mapping.get(course.teacherUsername) ?? course.teacherUsername; course.asignaturas?.forEach((item) => { item.teacherUsername = mapping.get(item.teacherUsername) ?? item.teacherUsername; }); course.students.forEach((student) => { student.username = mapping.get(student.username) ?? student.username; }); });
+  guardians.forEach((guardian) => { guardian.children = (guardian.children || []).map((child) => mapping.get(child) ?? child); });
 }
 async function main() {
   const accounts = [];
@@ -97,7 +129,7 @@ async function main() {
     const children = uniqueStudents.slice(i, i + count);
     if (!children.length) break;
     const username = `apoderado${String(guardianIndex).padStart(4, "0")}`;
-    const nombre = `${firstNames[(guardianIndex + 7) % firstNames.length]} ${middleNames[(guardianIndex + 3) % middleNames.length]} ${lastNames[(guardianIndex + 11) % lastNames.length]} ${secondLastNames[(guardianIndex + 17) % secondLastNames.length]}`;
+    const guardianFemale = guardianIndex % 2 === 0; const guardianFirst = (guardianFemale ? feminineFirstNames : masculineFirstNames)[guardianIndex % (guardianFemale ? feminineFirstNames.length : masculineFirstNames.length)]; const guardianMiddle = (guardianFemale ? feminineMiddleNames : masculineMiddleNames)[(guardianIndex + 3) % (guardianFemale ? feminineMiddleNames.length : masculineMiddleNames.length)]; const nombre = `${guardianFirst} ${guardianMiddle} ${lastNames[(guardianIndex + 11) % lastNames.length]} ${secondLastNames[(guardianIndex + 17) % secondLastNames.length]}`;
     guardians.push({ username, password: GENERATED_PASSWORD, nombre, email: emailForName(nombre, usedEmails), rol: "Apoderado", children: children.map((child) => child.username) });
     i += children.length - 1;
     guardianIndex += 1;
@@ -110,6 +142,7 @@ async function main() {
   }));
   accounts.push(...uniqueStudents, ...guardians);
   finalizeAccountEmails(accounts);
+  buildSchedules(courses);
 
   const credentials = [];
   console.log(`Inicio de sincronización: ${accounts.length} cuentas y ${courses.length} cursos.`);
