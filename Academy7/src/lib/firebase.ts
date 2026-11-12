@@ -1,7 +1,7 @@
 import { getApps, initializeApp } from 'firebase/app'
 import { getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth'
 import { addDoc, collection, doc, getDoc, getDocs, getFirestore, onSnapshot, query, serverTimestamp, setDoc, where } from 'firebase/firestore'
-import type { Course, Student, User } from '../types'
+import type { CalendarEvaluation, Course, ScheduleSession, Student, User } from '../types'
 
 const firebaseConfig = {
   apiKey: 'AIzaSyCPMkIFZ0mloz5lHUdUx5w4UaOYD6wta0w',
@@ -18,9 +18,8 @@ export const firebaseAuth = getAuth(app)
 export const firestore = getFirestore(app)
 
 export async function signIn(username: string, password: string) {
-  const emailAliases: Record<string, string> = { asilva: 'andreasilva' }
   const normalizedUsername = username.trim().toLowerCase()
-  let emailUsername = emailAliases[normalizedUsername] ?? normalizedUsername
+  let emailUsername = normalizedUsername
   if (!emailUsername.includes('@')) {
     const aliasSnapshot = await getDoc(doc(firestore, 'loginAliases', normalizedUsername))
     if (aliasSnapshot.exists()) emailUsername = String(aliasSnapshot.data().email ?? emailUsername)
@@ -46,6 +45,26 @@ export async function loadAuthenticatedProfile(username: string): Promise<User> 
     return { ...profile, ...(studentSnapshot.exists() ? studentSnapshot.data() : {}) } as User
   }
   return profile
+}
+
+export async function loadGuardianChildren(username: string): Promise<Student[]> {
+  const profileId = username.trim().toLowerCase().split('@')[0]
+  const guardianSnapshot = await getDoc(doc(firestore, 'guardians', profileId))
+  if (!guardianSnapshot.exists()) return []
+  const childIds = (guardianSnapshot.data().children ?? []) as string[]
+  const snapshots = await Promise.all(childIds.map((childId) => getDoc(doc(firestore, 'students', childId))))
+  return snapshots.filter((snapshot) => snapshot.exists()).map((snapshot) => ({
+    username: snapshot.id,
+    nombre: String(snapshot.data().nombre ?? snapshot.id),
+    curso: String(snapshot.data().curso ?? ''),
+    nivel: String(snapshot.data().nivel ?? ''),
+    promedio: typeof snapshot.data().promedio === 'number' ? snapshot.data().promedio : null,
+    asistencia: Number(snapshot.data().asistencia ?? 0),
+    evaluaciones: (snapshot.data().evaluaciones ?? {}) as Record<string, number | ''>,
+    warnings: (snapshot.data().warnings ?? []) as Student['warnings'],
+    attendance: (snapshot.data().attendance ?? {}) as Student['attendance'],
+    attendanceJustifications: (snapshot.data().attendanceJustifications ?? {}) as Student['attendanceJustifications'],
+  }))
 }
 
 function studentPath(teacherUsername: string, courseId: string, studentUsername: string) {
@@ -75,6 +94,18 @@ export async function saveStudentToFirebase(teacherUsername: string, courseId: s
     amonestaciones: student.warnings.length,
     updatedAt: serverTimestamp(),
   }, { merge: true })
+}
+
+export function listenTeacherSchedule(teacherUsername: string, onSchedule: (sessions: ScheduleSession[]) => void) {
+  return onSnapshot(collection(firestore, 'teachers', teacherUsername, 'schedule'), (snapshot) => {
+    onSchedule(snapshot.docs.map((item) => item.data() as ScheduleSession).sort((a, b) => `${a.dia}|${a.hora}`.localeCompare(`${b.dia}|${b.hora}`)))
+  })
+}
+
+export function listenTeacherCalendar(teacherUsername: string, onCalendar: (events: CalendarEvaluation[]) => void) {
+  return onSnapshot(collection(firestore, 'teachers', teacherUsername, 'calendar'), (snapshot) => {
+    onCalendar(snapshot.docs.map((item) => item.data() as CalendarEvaluation).sort((a, b) => a.date.localeCompare(b.date)))
+  })
 }
 
 export type TeacherMessage = { id: string; senderUsername: string; recipientUsername?: string; audience: 'student' | 'guardian' | 'both'; text: string; createdAt?: unknown }

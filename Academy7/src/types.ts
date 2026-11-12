@@ -22,6 +22,8 @@ export type SubjectAssignment = {
   hora: string
   sala: string
 }
+export type ScheduleSession = SubjectAssignment & { courseId: string; curso: string }
+export type CalendarEvaluation = { id: string; courseId: string; curso: string; key: string; date: string; teacherUsername: string }
 export type Course = {
   id: string
   nombre: string

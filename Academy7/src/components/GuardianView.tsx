@@ -1,16 +1,21 @@
 import { useEffect, useState } from 'react'
 import { getStudent, getStudentAssignments, calculateAttendance, calculateAverage, users, courses } from '../data/schoolSeed'
-import { listenTeacherMessages } from '../lib/firebase'
+import { listenTeacherMessages, loadGuardianChildren } from '../lib/firebase'
 import type { TeacherMessage } from '../lib/firebase'
+import type { Student } from '../types'
 import { Stat } from './PortalLayout'
 
 export function GuardianView({ section, username }: { section: string; username: string }) {
   const guardian = users.find((user) => user.username === username)
-  const children = (guardian?.children ?? []).map(getStudent).filter((student): student is NonNullable<typeof student> => Boolean(student))
+  const localChildren = (guardian?.children ?? []).map(getStudent).filter((student): student is NonNullable<typeof student> => Boolean(student))
+  const [firebaseChildren, setFirebaseChildren] = useState<Student[]>([])
+  useEffect(() => { void loadGuardianChildren(username).then(setFirebaseChildren).catch(() => setFirebaseChildren([])) }, [username])
+  const children = firebaseChildren.length ? firebaseChildren : localChildren
   const [selectedUsername, setSelectedUsername] = useState(children[0]?.username ?? '')
   const child = children.find((student) => student.username === selectedUsername) ?? children[0]
-  const assignments = child ? getStudentAssignments(child.username) : []
-  const teacherUsername = child ? courses.find((item) => item.students.some((student) => student.username === child.username))?.teacherUsername : undefined
+  const courseForChild = child ? courses.find((item) => item.curso === child.curso || item.students.some((student) => student.username === child.username)) : undefined
+  const assignments = courseForChild?.asignaturas ?? (child ? getStudentAssignments(child.username) : [])
+  const teacherUsername = courseForChild?.teacherUsername
   const [messages, setMessages] = useState<TeacherMessage[]>([])
   useEffect(() => teacherUsername ? listenTeacherMessages(teacherUsername, setMessages, { username, role: 'Apoderado' }) : undefined, [teacherUsername, username])
   const visibleMessages = messages.filter((item) => item.audience === 'guardian' || item.audience === 'both')
