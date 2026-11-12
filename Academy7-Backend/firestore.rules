@@ -24,6 +24,14 @@ service cloud.firestore {
       }
       match /attendance/{sessionId} { allow read, write: if isTeacher(teacherId); }
     }
+    match /teachers/{teacherId}/schedule/{sessionId} {
+      allow read: if isTeacher(teacherId);
+      allow write: if isTeacher(teacherId);
+    }
+    match /teachers/{teacherId}/calendar/{eventId} {
+      allow read: if isTeacher(teacherId);
+      allow write: if isTeacher(teacherId);
+    }
     match /teachers/{teacherId}/messages/{messageId} {
       allow create, update, delete: if isTeacher(teacherId);
       allow read: if isTeacher(teacherId)

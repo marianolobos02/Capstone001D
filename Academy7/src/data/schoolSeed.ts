@@ -74,7 +74,9 @@ export const users: User[] = [
 ]
 
 export function getUser(username: string) { return users.find((user) => user.username === username) ?? users[0] }
+export function usernameFromName(name: string) { const parts = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z\s]/g, '').trim().split(/\s+/); return `${parts[0] ?? ''}${parts[2] ?? parts[1] ?? ''}` }
 export function getStudent(username: string) { return allStudents.find((student) => student.username === username) }
+export function getStudentByIdentity(username: string, name?: string) { return getStudent(username) ?? allStudents.find((student) => usernameFromName(student.nombre) === username) ?? allStudents.find((student) => student.nombre === name) }
 export function getCourseForStudent(username: string) {
   const student = getStudent(username)
   return student ? courses.find((course) => course.curso === student.curso) : undefined
