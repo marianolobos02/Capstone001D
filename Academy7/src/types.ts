@@ -21,9 +21,10 @@ export type SubjectAssignment = {
   dia: string
   hora: string
   sala: string
+  bloques?: number
 }
 export type ScheduleSession = SubjectAssignment & { courseId: string; curso: string }
-export type CalendarEvaluation = { id: string; courseId: string; curso: string; key: string; date: string; teacherUsername: string }
+export type CalendarEvaluation = { id: string; courseId: string; curso: string; key: string; date: string; teacherUsername: string; subject?: string }
 export type Course = {
   id: string
   nombre: string
