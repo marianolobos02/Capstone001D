@@ -74,37 +74,56 @@ async function removeStaleAcademyAccounts(accounts) {
   }
 }
 const schoolDays = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
-const schoolSlots = ["08:00–08:40", "08:40–09:20", "09:20–10:00", "10:00–10:40", "10:50–11:30", "11:30–12:10", "12:10–12:50", "13:00–13:40", "13:40–14:20", "14:20–15:00", "15:10–15:50", "15:50–16:30", "16:30–17:10", "17:10–17:50"];
-const schoolWindows = [[0, 3], [4, 6], [7, 9], [10, 13]];
+const morningSlots = ["08:00–08:40", "08:40–09:20", "09:30–10:10", "10:10–10:50", "10:50–11:30", "11:40–12:20", "12:20–13:00"];
+const afternoonSlots = ["13:00–13:40", "13:40–14:20", "14:30–15:10", "15:10–15:50", "15:50–16:30", "16:40–17:20", "17:20–18:00"];
+const schoolWindows = [[0, 1], [2, 4], [5, 6]];
+function scheduleSlotsForCourse(course) {
+  const match = String(course.curso).match(/(\d+)° (Básico|Medio)/);
+  const level = Number(match?.[1] || 1);
+  const morning = match?.[2] === "Básico" ? level >= 5 : level >= 3;
+  return morning ? morningSlots : afternoonSlots;
+}
 const evaluationKeys = ["semestre1Prueba1", "semestre1Prueba2", "semestre1Prueba3", "semestre1Global", "semestre2Prueba1", "semestre2Prueba2", "semestre2Prueba3", "semestre2Global", "examen"];
 const evaluationDates = ["2026-04-01", "2026-05-06", "2026-06-10", "2026-07-01", "2026-08-12", "2026-09-09", "2026-10-07", "2026-11-04", "2026-11-25"];
+function dateWithOffset(base, offset) { const date = new Date(`${base}T12:00:00`); date.setDate(date.getDate() + offset); return date.toISOString().slice(0, 10); }
+function dateOnWeekday(base, weekday) { if (!weekday) return base; const names = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]; const target = names.indexOf(weekday); if (target < 0) return base; const date = new Date(`${base}T12:00:00`); date.setDate(date.getDate() + ((target - date.getDay() + 7) % 7)); return date.toISOString().slice(0, 10); }
+function calendarEventsForCourse(course, courseIndex) {
+  const match = String(course.curso).match(/(\d+)°/); const level = Number(match?.[1] || 1); const medium = course.curso.includes("Medio"); const spread = courseIndex % 4;
+  const bases = medium && level === 4 ? ["2026-04-06", "2026-05-04", "2026-06-01", "2026-07-06", "2026-08-24", "2026-09-21", "2026-10-19", "2026-11-02"] : ["2026-04-06", "2026-05-04", "2026-06-01", "2026-07-06", "2026-09-07", "2026-10-05", "2026-11-02", "2026-12-01"];
+  const preferredWeekday = course.asignaturas.find((item) => (item.bloques ?? 1) >= 2)?.dia; const keys = evaluationKeys.filter((key) => key !== "examen"); const events = keys.map((key, index) => ({ key, date: dateOnWeekday(dateWithOffset(bases[index], spread), preferredWeekday) }));
+  if (medium) { const subjects = [...new Set(course.asignaturas.map((item) => item.asignatura))]; const examStart = level === 4 ? "2026-11-23" : "2026-12-10"; subjects.forEach((subject, index) => events.push({ key: "examen", subject, date: dateOnWeekday(dateWithOffset(examStart, index), preferredWeekday) })); }
+  return events;
+}
 function buildSchedules(courses) {
   const teacherBusy = new Map();
   courses.forEach((course, courseIndex) => {
     const courseBusy = new Set();
-    course.asignaturas = course.asignaturas.map((subject, subjectIndex) => {
+    const schoolSlots = scheduleSlotsForCourse(course);
+    course.asignaturas = course.asignaturas.flatMap((subject, subjectIndex) => {
       const teacherList = course.docentesPorAsignatura?.[subject] ?? [];
       const teacherUsername = teacherList[(courseIndex + subjectIndex) % Math.max(teacherList.length, 1)] ?? course.teacherUsername;
-      const blockCount = 2 + ((courseIndex + subjectIndex) % 3);
+      const pattern = subjectIndex % 3;
+      const dayCounts = pattern === 0 ? [3, 1] : pattern === 1 ? [2, 2] : [4];
       const teacherKeys = teacherBusy.get(teacherUsername) ?? new Set();
-      let selected = null;
-      for (let offset = 0; offset < schoolDays.length * schoolWindows.length; offset += 1) {
-        const window = schoolWindows[(courseIndex + subjectIndex + offset) % schoolWindows.length];
-        const windowLength = window[1] - window[0] + 1;
-        if (blockCount > windowLength) continue;
-        const start = window[0] + ((courseIndex * 2 + subjectIndex + offset) % (windowLength - blockCount + 1));
-        const dayIndex = (courseIndex + subjectIndex + Math.floor(offset / schoolWindows.length)) % schoolDays.length;
-        const keys = Array.from({ length: blockCount }, (_, index) => `${schoolDays[dayIndex]}|${schoolSlots[start + index]}`);
-        if (keys.every((key) => !courseBusy.has(key) && !teacherKeys.has(key))) { selected = { dayIndex, start, keys }; break; }
+      const sessions = [];
+      let sessionNumber = 0;
+      for (let dayGroup = 0; dayGroup < dayCounts.length; dayGroup += 1) {
+        const dayIndex = (courseIndex + subjectIndex + dayGroup) % schoolDays.length;
+        const blockCount = dayCounts[dayGroup]; let selected = null;
+        for (let offset = 0; offset <= schoolSlots.length - blockCount; offset += 1) {
+          const start = (courseIndex * 2 + subjectIndex + sessionNumber + offset) % (schoolSlots.length - blockCount + 1);
+          const keys = Array.from({ length: blockCount }, (_, block) => `${schoolDays[dayIndex]}|${schoolSlots[start + block]}`);
+          if (keys.every((key) => !courseBusy.has(key) && !teacherKeys.has(key))) { selected = { start, keys }; break; }
+        }
+        if (!selected) throw new Error(`No hay bloque disponible para ${teacherUsername} en ${course.curso}`);
+        selected.keys.forEach((key) => { teacherKeys.add(key); courseBusy.add(key); });
+        sessions.push({ asignatura: subject, teacherUsername, docente: teacherNames[teacherUsername === "asilva" ? 0 : Math.max(0, Number(String(teacherUsername).replace("docente", "")) - 1)] ?? teacherUsername, dia: schoolDays[dayIndex], hora: `${schoolSlots[selected.start]} · ${schoolSlots[selected.start + blockCount - 1]}`, sala: subject === "Educación Física" ? "Gimnasio" : course.sala, bloques: blockCount, bloqueSemanal: sessionNumber + 1, bloquesSemanales: 4 });
+        sessionNumber += blockCount;
       }
-      const fallbackWindow = schoolWindows[subjectIndex % schoolWindows.length];
-      const fallbackStart = fallbackWindow[0] + Math.max(0, Math.min(subjectIndex % 2, fallbackWindow[1] - fallbackWindow[0] + 1 - blockCount));
-      selected ??= { dayIndex: subjectIndex % schoolDays.length, start: fallbackStart, keys: Array.from({ length: blockCount }, (_, index) => `${schoolDays[subjectIndex % schoolDays.length]}|${schoolSlots[fallbackStart + index]}`) };
-      selected.keys.forEach((key) => { teacherKeys.add(key); courseBusy.add(key); });
       teacherBusy.set(teacherUsername, teacherKeys);
-      return { asignatura: subject, teacherUsername, docente: teacherNames[teacherUsername === "asilva" ? 0 : Math.max(0, Number(String(teacherUsername).replace("docente", "")) - 1)] ?? teacherUsername, dia: schoolDays[selected.dayIndex], hora: `${schoolSlots[selected.start]} · ${schoolSlots[selected.start + blockCount - 1]}`, sala: subject === "Educación Física" ? "Gimnasio" : course.sala, bloques: blockCount };
+      return sessions;
     });
-    course.horario = "Lunes a viernes · 08:00–17:50 · asignaturas de 2 a 4 bloques consecutivos · recreos de 10 minutos";
+    course.horario = scheduleSlotsForCourse(course) === morningSlots ? "Jornada mañana · 08:00–13:00 · 4 bloques semanales por curso · recreos de 10 minutos" : "Jornada tarde · 13:00–18:00 · 4 bloques semanales por curso · recreos de 10 minutos";
     course.teacherUsername = course.asignaturas[0]?.teacherUsername ?? course.teacherUsername;
   });
   return courses;
@@ -198,26 +217,29 @@ async function main() {
   console.log("[2/2] Procesando cursos y listas de estudiantes...");
   for (let courseIndex = 0; courseIndex < courses.length; courseIndex += 1) {
     const course = courses[courseIndex];
-    const courseRef = db.collection("teachers").doc(course.teacherUsername).collection("courses").doc(course.id);
-    await courseRef.set({ id: course.id, nombre: course.nombre, curso: course.curso, sala: course.sala, horario: course.horario, periodo: course.periodo, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
     const teachersInCourse = [...new Set(course.asignaturas.map((item) => item.teacherUsername))];
+    const courseRefs = teachersInCourse.map((teacherUsername) => db.collection("teachers").doc(teacherUsername).collection("courses").doc(course.id));
+    for (const courseRef of courseRefs) {
+      await courseRef.set({ id: course.id, nombre: course.nombre, curso: course.curso, sala: course.sala, horario: course.horario, periodo: "Año escolar 2026", updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    }
     for (const teacherUsername of teachersInCourse) {
       const teacherAssignments = course.asignaturas.filter((item) => item.teacherUsername === teacherUsername);
       for (let assignmentIndex = 0; assignmentIndex < teacherAssignments.length; assignmentIndex += 1) {
         const assignment = teacherAssignments[assignmentIndex];
         await db.collection("teachers").doc(teacherUsername).collection("schedule").doc(`${course.id}-${assignmentIndex}`).set({ courseId: course.id, curso: course.curso, ...assignment, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
       }
-      const evaluationCount = course.curso.includes("Medio") ? evaluationKeys.length : evaluationKeys.length - 1;
-      for (let evaluationIndex = 0; evaluationIndex < evaluationCount; evaluationIndex += 1) {
-        const key = evaluationKeys[evaluationIndex];
-        await db.collection("teachers").doc(teacherUsername).collection("calendar").doc(`${course.id}-${key}`).set({ id: `${course.id}-${key}`, courseId: course.id, curso: course.curso, key, date: evaluationDates[evaluationIndex], teacherUsername, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      for (const event of calendarEventsForCourse(course, courseIndex)) {
+        const eventId = `${course.id}-${event.key}-${event.subject ?? "general"}`;
+        await db.collection("teachers").doc(teacherUsername).collection("calendar").doc(eventId).set({ id: eventId, courseId: course.id, curso: course.curso, ...event, teacherUsername, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
       }
     }
     let batch = db.batch(); let writes = 0;
     for (const student of course.students) {
-      batch.set(courseRef.collection("students").doc(student.username), { username: student.username, nombre: student.nombre, promedio: null, asistencia: 0, amonestaciones: 0, evaluaciones: {}, warnings: [], updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-      writes += 1;
-      if (writes === 400) { await batch.commit(); batch = db.batch(); writes = 0; }
+      for (const courseRef of courseRefs) {
+        batch.set(courseRef.collection("students").doc(student.username), { username: student.username, nombre: student.nombre, promedio: null, asistencia: 0, amonestaciones: 0, evaluaciones: {}, warnings: [], updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+        writes += 1;
+        if (writes === 400) { await batch.commit(); batch = db.batch(); writes = 0; }
+      }
     }
     if (writes) await batch.commit();
     console.log(`  Curso: ${courseIndex + 1}/${courses.length} · ${course.curso} · ${course.students.length} estudiantes`);
