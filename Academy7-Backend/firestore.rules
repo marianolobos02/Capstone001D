@@ -33,7 +33,10 @@ service cloud.firestore {
       allow write: if isTeacher(teacherId);
     }
     match /teachers/{teacherId}/messages/{messageId} {
-      allow create, update, delete: if isTeacher(teacherId);
+      allow create: if isTeacher(teacherId)
+        || (hasRole('Estudiante') && request.resource.data.senderUsername == username() && request.resource.data.recipientUsername == teacherId && request.resource.data.audience == 'student')
+        || (hasRole('Apoderado') && request.resource.data.senderUsername == username() && request.resource.data.recipientUsername == teacherId && request.resource.data.audience == 'guardian');
+      allow update, delete: if isTeacher(teacherId);
       allow read: if isTeacher(teacherId)
         || (hasRole('Estudiante') && (resource.data.audience == 'student' || resource.data.audience == 'both') && (resource.data.recipientUsername == username() || resource.data.recipientUsername == 'all-students' || resource.data.recipientUsername == 'all-both'))
         || (hasRole('Apoderado') && (resource.data.audience == 'guardian' || resource.data.audience == 'both') && (resource.data.recipientUsername == username() || resource.data.recipientUsername == 'all-guardians' || resource.data.recipientUsername == 'all-both'));

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { calendarEventsForCourse, calculateAttendance, calculateAverage, courses, getStudent, users } from '../data/schoolSeed'
-import { listenTeacherMessages, loadGuardianChildren } from '../lib/firebase'
+import { calendarEventsForCourse, calculateAttendance, calculateAverage, courses, getStudent, subjectsForCourseLabel, users } from '../data/schoolSeed'
+import { listenTeacherMessages, loadGuardianChildren, sendMessageToTeacher } from '../lib/firebase'
 import type { TeacherMessage } from '../lib/firebase'
 import type { Student, SubjectAssignment } from '../types'
 import { Stat } from './PortalLayout'
@@ -32,7 +32,11 @@ function getCourse(student: Student) {
 }
 
 function getAssignments(student: Student): SubjectAssignment[] {
-  return getCourse(student)?.asignaturas ?? []
+  const course = getCourse(student)
+  const assignments = course?.asignaturas ?? []
+  const known = new Set(assignments.map((item) => item.asignatura))
+  const fallbackTeacher = assignments.find((item) => item.docente)?.docente ?? 'Docente asignado'
+  return [...assignments, ...subjectsForCourseLabel(student.curso).filter((subject) => !known.has(subject)).map((subject) => ({ asignatura: subject, teacherUsername: course?.teacherUsername ?? '', docente: fallbackTeacher, dia: 'Por asignar', hora: 'Por asignar', sala: 'Por asignar', bloques: 2 }))]
 }
 
 function formatDate(value: string) {
@@ -74,6 +78,18 @@ function ChildDetail({ student, onBack }: { student: Student; onBack: () => void
         {assignments.length ? <div className="table-wrap"><table><thead><tr><th>Asignatura</th><th>Docente</th><th>Día</th><th>Hora</th><th>Sala</th></tr></thead><tbody>{assignments.map((item, index) => <tr key={`${item.asignatura}-${item.dia}-${index}`}><td><strong>{item.asignatura}</strong></td><td>{item.docente}</td><td>{item.dia}</td><td>{item.hora}</td><td>{item.sala}</td></tr>)}</tbody></table></div> : <p className="muted">No hay horario disponible.</p>}
       </section>
       <section className="panel">
+        <div className="section-title-row"><div><span className="eyebrow">Rendimiento académico</span><h3>Calificaciones</h3></div></div>
+        {grades.length ? <div className="table-wrap"><table><thead><tr><th>Evaluación</th><th>Calificación</th></tr></thead><tbody>{Object.entries(student.evaluaciones).filter(([, value]) => typeof value === 'number').map(([key, value]) => <tr key={key}><td>{key}</td><td><strong>{Number(value).toFixed(1)}</strong></td></tr>)}</tbody></table></div> : <p className="muted">No hay calificaciones registradas.</p>}
+      </section>
+      <section className="panel">
+        <div className="section-title-row"><div><span className="eyebrow">Asistencia</span><h3>Porcentaje de asistencia</h3></div><strong className="big-number">{calculateAttendance(student)}%</strong></div>
+        <p className="muted">El porcentaje se calcula con las asistencias registradas para este estudiante.</p>
+      </section>
+      <section className="panel">
+        <div className="section-title-row"><div><span className="eyebrow">Agenda académica</span><h3>Calendario de evaluaciones</h3></div></div>
+        {(() => { const events = calendarEventsForCourse(student.curso, 0, assignments.map((item) => item.asignatura)).slice(0, 8); return events.length ? <div className="calendar-list">{events.map((event, index) => <article className="calendar-event" key={`${event.key}-${event.date}-${index}`}><strong>{event.subject ?? event.key}</strong><span>{formatDate(event.date)}</span></article>)}</div> : <p className="muted">No hay evaluaciones próximas.</p> })()}
+      </section>
+      <section className="panel">
         <div className="section-title-row"><div><span className="eyebrow">Convivencia escolar</span><h3>Amonestaciones</h3></div></div>
         {student.warnings.length ? student.warnings.map((warning) => <article className="warning-card" key={warning.id}><strong>{warning.tipo}</strong><span>{warning.fecha}</span><p>{warning.detalle}</p></article>) : <p className="muted">Este estudiante no tiene amonestaciones registradas.</p>}
       </section>
@@ -87,6 +103,9 @@ export function GuardianView({ section, username }: GuardianProps) {
   const [firebaseChildren, setFirebaseChildren] = useState<Student[]>([])
   const [detailUsername, setDetailUsername] = useState('')
   const [messages, setMessages] = useState<TeacherMessage[]>([])
+  const [messageText, setMessageText] = useState('')
+  const [sentMessages, setSentMessages] = useState<TeacherMessage[]>([])
+  const [selectedTeacher, setSelectedTeacher] = useState('')
 
   useEffect(() => { void loadGuardianChildren(username).then(setFirebaseChildren).catch(() => setFirebaseChildren([])) }, [username])
 
@@ -102,11 +121,11 @@ export function GuardianView({ section, username }: GuardianProps) {
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe())
   }, [teacherUsernames, username])
 
-  const visibleMessages = messages.filter((item) => item.audience === 'guardian' || item.audience === 'both')
+  const visibleMessages = [...messages, ...sentMessages].filter((item) => item.audience === 'guardian' || item.audience === 'both')
   const openChild = (childUsername: string) => setDetailUsername(childUsername)
   const closeDetail = () => setDetailUsername('')
   if (detailChild) return <ChildDetail student={detailChild} onBack={closeDetail} />
-  if (section === 'Mensajes') return <section className="panel"><span className="eyebrow">Comunicaciones</span><h1>Mensajes del colegio</h1>{visibleMessages.length ? visibleMessages.slice().reverse().map((item) => <article className="message-card" key={item.id}><strong>Docente {item.senderUsername}</strong><p>{item.text}</p></article>) : <p className="muted">No hay mensajes nuevos.</p>}</section>
+  if (section === 'Mensajes') { const teacher = selectedTeacher || teacherUsernames[0] || ''; return <section className="panel"><span className="eyebrow">Comunicaciones</span><h1>Mensajes del colegio</h1><p className="muted">Puedes responder únicamente a los docentes de tus hijos.</p><div className="message-compose"><select aria-label="Docente destinatario" value={teacher} onChange={(event) => setSelectedTeacher(event.target.value)}>{teacherUsernames.map((item) => <option key={item} value={item}>Docente: {item}</option>)}</select><textarea className="message-box" value={messageText} onChange={(event) => setMessageText(event.target.value)} placeholder="Escribe un mensaje al docente..." /><button className="primary-action" disabled={!messageText.trim() || !teacher} onClick={() => { const text = messageText.trim(); if (!teacher || !text) return; void sendMessageToTeacher(teacher, username, 'guardian', text).then(() => { setSentMessages((current) => [...current, { id: `local-${Date.now()}`, senderUsername: username, recipientUsername: teacher, audience: 'guardian', text }]); setMessageText('') }) }}>Enviar al docente</button></div>{visibleMessages.length ? visibleMessages.slice().reverse().map((item) => <article className="message-card" key={item.id}><strong>{item.senderUsername === username ? 'Tú' : `Docente ${item.senderUsername}`}</strong><p>{item.text}</p></article>) : <p className="muted">No hay mensajes nuevos.</p>}</section> }
   if (!children.length) return <section className="panel"><span className="eyebrow">Cuenta familiar</span><h1>Sin hijos asociados</h1><p>Solicita al colegio asociar un estudiante a tu cuenta.</p></section>
 
   if (section === 'Inicio') {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { calculateAttendance, calculateAverage, calendarEventsForCourse, courses, evaluationKeysForCourse, getStudentByIdentity, subjectsForCourseLabel } from '../data/schoolSeed'
-import { listenTeacherMessages } from '../lib/firebase'
+import { listenTeacherMessages, sendMessageToTeacher } from '../lib/firebase'
 import type { TeacherMessage } from '../lib/firebase'
 import type { Course, Student } from '../types'
 import { Stat } from './PortalLayout'
@@ -38,10 +38,13 @@ export function StudentView({ section, username, name, course: profileCourse }: 
   const course = courses.find((item) => item.curso === profileCourse || item.curso === student.curso)
   const teacherUsername = course?.teacherUsername
   const [messages, setMessages] = useState<TeacherMessage[]>([])
+  const [messageText, setMessageText] = useState('')
+  const [sentMessages, setSentMessages] = useState<TeacherMessage[]>([])
   useEffect(() => teacherUsername ? listenTeacherMessages(teacherUsername, setMessages, { username, role: 'Estudiante' }) : undefined, [teacherUsername, username])
   void messages
   if (section === 'Inicio') return <Home student={student} course={course} />
   if (section === 'Cursos' || section === 'Mis asignaturas') return <CoursesView student={student} course={course} />
   if (section === 'Amonestaciones') return <section className="panel"><span className="eyebrow">Convivencia escolar</span><h1>Mis amonestaciones</h1><p className="muted">Total registrado: {student.warnings.length}</p>{student.warnings.length ? student.warnings.map((warning) => <div className="warning-card" key={warning.id}><strong>{warning.tipo}</strong><span>{warning.fecha}</span><p>{warning.detalle}</p></div>) : <p>No hay amonestaciones registradas.</p>}</section>
+  if (section === 'Mensajes') { const visibleMessages = [...messages, ...sentMessages]; return <section className="panel"><span className="eyebrow">Comunicaciones</span><h1>Mensajes con el docente</h1><p className="muted">Puedes recibir mensajes y escribir únicamente a tu docente.</p><div className="message-compose"><textarea className="message-box" value={messageText} onChange={(event) => setMessageText(event.target.value)} placeholder="Escribe un mensaje al docente..." /><button className="primary-action" disabled={!messageText.trim() || !teacherUsername} onClick={() => { const text = messageText.trim(); if (!teacherUsername || !text) return; void sendMessageToTeacher(teacherUsername, username, 'student', text).then(() => { setSentMessages((current) => [...current, { id: `local-${Date.now()}`, senderUsername: username, recipientUsername: teacherUsername, audience: 'student', text }]); setMessageText('') }) }}>Enviar al docente</button></div>{visibleMessages.length ? visibleMessages.slice().reverse().map((item) => <article className="message-card" key={item.id}><strong>{item.senderUsername === username ? 'Tú' : `Docente ${item.senderUsername}`}</strong><p>{item.text}</p></article>) : <p className="muted">No hay mensajes todavía.</p>}</section> }
   return <Home student={student} course={course} />
 }

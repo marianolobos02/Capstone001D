@@ -18,10 +18,11 @@ export const firebaseAuth = getAuth(app)
 export const firestore = getFirestore(app)
 
 export async function signIn(username: string, password: string) {
-  const normalizedUsername = username.trim().toLowerCase()
-  let emailUsername = normalizedUsername
+  const exactUsername = username.trim()
+  if (!exactUsername || exactUsername !== exactUsername.toLowerCase()) throw new Error('El usuario debe escribirse exactamente en minúsculas.')
+  let emailUsername = exactUsername
   if (!emailUsername.includes('@')) {
-    const aliasSnapshot = await getDoc(doc(firestore, 'loginAliases', normalizedUsername))
+    const aliasSnapshot = await getDoc(doc(firestore, 'loginAliases', exactUsername))
     if (aliasSnapshot.exists()) emailUsername = String(aliasSnapshot.data().email ?? emailUsername)
   }
   const email = emailUsername.includes('@') ? emailUsername : `${emailUsername}@academy7.cl`
@@ -124,4 +125,14 @@ export function listenTeacherMessages(teacherUsername: string, onMessages: (mess
 
 export async function sendTeacherMessage(teacherUsername: string, message: Omit<TeacherMessage, 'id' | 'createdAt' | 'senderUsername'>) {
   await addDoc(collection(firestore, 'teachers', teacherUsername, 'messages'), { ...message, senderUsername: teacherUsername, createdAt: serverTimestamp() })
+}
+
+export async function sendMessageToTeacher(teacherUsername: string, senderUsername: string, audience: 'student' | 'guardian', text: string) {
+  await addDoc(collection(firestore, 'teachers', teacherUsername, 'messages'), {
+    senderUsername,
+    recipientUsername: teacherUsername,
+    audience,
+    text,
+    createdAt: serverTimestamp(),
+  })
 }
