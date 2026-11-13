@@ -1,0 +1,7 @@
+{
+  "hosting": {
+    "public": "dist",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "serviceAccountKey.json", "academy7-account-credentials.csv"],
+    "rewrites": [{ "source": "**", "destination": "/index.html" }]
+  }
+}

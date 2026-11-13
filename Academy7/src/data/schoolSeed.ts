@@ -66,6 +66,15 @@ function makeAssignments(level: number, letter: string, medium = false, courseIn
       if (start >= 0) sessions.push({ asignatura, teacherUsername, docente: teacherNames[teacherIndex] ?? `Docente ${teacherUsername}`, dia: weekdays[dayIndex], hora: `${timeSlots[start]} · ${timeSlots[start + blockCount - 1]}`, sala, bloques: blockCount })
       sessionNumber += blockCount
     }
+    if (!sessions.length) {
+      const fallbackDay = weekdays[(courseIndex + index) % weekdays.length]
+      const fallbackStart = Math.max(0, Math.min(timeSlots.length - 2, (courseIndex + index) % Math.max(1, timeSlots.length - 1)))
+      const fallbackKeys = [`${fallbackDay}|${timeSlots[fallbackStart]}`, `${fallbackDay}|${timeSlots[fallbackStart + 1]}`]
+      if (fallbackKeys.every((key) => !courseBusy.has(key) && !teacherBusy.has(key))) {
+        fallbackKeys.forEach((key) => { courseBusy.add(key); teacherBusy.add(key) })
+        sessions.push({ asignatura, teacherUsername, docente: teacherNames[teacherIndex] ?? `Docente ${teacherUsername}`, dia: fallbackDay, hora: `${timeSlots[fallbackStart]} · ${timeSlots[fallbackStart + 1]}`, sala, bloques: 2 })
+      }
+    }
     localTeacherBusy.set(teacherUsername, teacherBusy)
     return sessions
   })
