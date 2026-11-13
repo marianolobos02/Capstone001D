@@ -528,3 +528,55 @@ code { padding: 2px 5px; border-radius: 4px; color: #7b5c12; background: #fbf3d9
     transition: none !important;
   }
 }
+
+
+/* Guardian view additions */
+
+/* Guardian view */
+.section-lead { margin: 10px 0 22px; color: #737b88; line-height: 1.6; }
+.guardian-family-summary { padding: 26px; }
+.summary-count { color: #737b88; font-size: 13px; }
+.guardian-child-list { display: grid; gap: 10px; margin-top: 22px; }
+.guardian-child-card { display: flex; align-items: center; gap: 14px; width: 100%; padding: 15px 16px; border: 1px solid #e5dfd1; border-radius: 12px; color: #24314f; background: #fffdf8; text-align: left; cursor: pointer; transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease; }
+.guardian-child-card:hover { border-color: #c4a559; box-shadow: 0 8px 22px rgba(36,49,79,.08); transform: translateY(-1px); }
+.guardian-child-avatar, .guardian-detail-avatar { display: grid; place-items: center; flex: 0 0 auto; width: 44px; height: 44px; border-radius: 13px; color: #24314f; background: #e9c76c; font-weight: 800; }
+.guardian-child-copy { display: grid; gap: 3px; min-width: 0; flex: 1; }
+.guardian-child-copy strong { font-size: 15px; }
+.guardian-child-copy span { color: #586171; font-size: 13px; }
+.guardian-child-copy small { color: #9a7b35; font-size: 11px; }
+.guardian-child-arrow { color: #a8791e; font-size: 20px; }
+.child-section { margin-top: 26px; padding-top: 22px; border-top: 1px solid #eee9df; }
+.child-section:first-of-type { margin-top: 20px; padding-top: 0; border-top: 0; }
+.child-section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 15px; width: 100%; margin-bottom: 12px; padding: 0; border: 0; color: #24314f; background: transparent; text-align: left; cursor: pointer; }
+.child-section-title strong { font-family: Georgia, serif; font-size: 21px; font-weight: 500; }
+.child-section-title span { color: #a8791e; font-size: 12px; }
+.guardian-attendance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin-top: 22px; }
+.attendance-child-card { padding: 20px; border: 1px solid #e5dfd1; border-radius: 12px; background: #fbf8f1; }
+.attendance-child-card h3 { margin: 5px 0 0; font-family: Georgia, serif; font-size: 20px; font-weight: 500; }
+.attendance-child-card .eyebrow { margin-bottom: 0; }
+.attendance-child-card .big-number { margin-top: 22px; }
+.grade-child-heading { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 13px; }
+.grade-child-heading h3 { margin: 0 0 4px; font-family: Georgia, serif; font-size: 21px; font-weight: 500; }
+.grade-child-heading span { color: #737b88; font-size: 13px; }
+.grade-child-heading > strong { color: #7b5c12; font-size: 14px; }
+.guardian-warning { margin-top: 12px; border-left-color: #b56b52; }
+.warning-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.warning-meta span { color: #737b88; font-size: 12px; }
+.guardian-warning small { color: #737b88; font-size: 12px; }
+.guardian-warning small strong { color: #24314f; }
+.calendar-list { display: grid; gap: 10px; margin-top: 20px; }
+.guardian-calendar-event { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 0; }
+.guardian-calendar-event div { display: grid; gap: 5px; }
+.guardian-calendar-event b { color: #24314f; font-size: 12px; text-align: right; }
+.guardian-detail-page { max-width: 1080px; }
+.back-link { margin: 0 0 22px; padding: 0; border: 0; color: #9a7323; background: transparent; font-size: 13px; font-weight: 700; cursor: pointer; }
+.guardian-detail-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
+.guardian-detail-heading h1 { max-width: 800px; margin: 4px 0 7px; font-family: Georgia, serif; font-size: clamp(30px, 4vw, 46px); font-weight: 500; }
+.guardian-detail-heading p { margin: 0; color: #737b88; }
+.guardian-detail-avatar { width: 68px; height: 68px; border-radius: 20px; font-size: 20px; }
+.guardian-detail-stats { margin-bottom: 20px; }
+.vital-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
+.vital-grid div { display: grid; gap: 5px; padding: 14px; border-radius: 9px; background: #fbf8f1; }
+.vital-grid span { color: #737b88; font-size: 12px; }
+.vital-grid strong { color: #24314f; font-size: 14px; }
+@media (max-width: 650px) { .child-section-title, .grade-child-heading, .guardian-calendar-event, .warning-meta { align-items: flex-start; flex-direction: column; }.guardian-calendar-event b { text-align: left; }.vital-grid { grid-template-columns: 1fr; }.guardian-detail-heading { align-items: flex-start; }.guardian-detail-avatar { width: 52px; height: 52px; border-radius: 15px; font-size: 16px; } }
