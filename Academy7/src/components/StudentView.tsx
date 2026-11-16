@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { calculateAttendance, calculateAverage, calendarEventsForCourse, courses, evaluationKeysForCourse, getStudentByIdentity, subjectsForCourseLabel } from '../data/schoolSeed'
-import { listenTeacherMessages, sendMessageToTeacher } from '../lib/firebase'
+import { listenTeacherMessages, loadAcademicRecord, loadStudentFromFirebase, sendMessageToTeacher } from '../lib/firebase'
 import type { TeacherMessage } from '../lib/firebase'
 import type { Course, Student } from '../types'
 import { Stat } from './PortalLayout'
@@ -13,7 +13,7 @@ function localStudent(username: string, name: string | undefined, course: string
 }
 
 function Home({ student, course }: { student: Student; course?: Course }) {
-  const assignments = course?.asignaturas ?? []
+  const assignments = student.schedule?.length ? student.schedule : course?.asignaturas ?? []
   const events = calendarEventsForCourse(student.curso, course ? courses.findIndex((item) => item.id === course.id) : 0, assignments.map((item) => item.asignatura), assignments.find((item) => (item.bloques ?? 1) >= 2)?.dia)
   return <>
     <div className="hero student"><div><span className="eyebrow">Panel del estudiante</span><h1>Hola, {student.nombre.split(' ')[0]}</h1><p>{student.nombre} · {student.curso}</p></div></div>
@@ -33,10 +33,21 @@ function CoursesView({ student, course }: { student: Student; course?: Course })
   return <section className="panel"><span className="eyebrow">Rendimiento académico · {student.curso}</span><h1>Cursos</h1><p className="muted">Cada materia aparece una sola vez. Selecciona una para revisar todas sus calificaciones y asistencia.</p><div className="course-tabs module-tabs">{uniqueAssignments.map((item) => <button type="button" key={item.asignatura} className={selectedSubject === item.asignatura ? 'tab active' : 'tab'} onClick={() => setSelectedSubject(item.asignatura)}>{item.asignatura}</button>)}</div>{assignment ? <><h2>{assignment.asignatura}</h2><p className="course-caption">Docente: {assignment.docente}</p><div className="stats"><Stat label="Asistencia" value={`${calculateAttendance(student)}%`} /><Stat label="Promedio" value={calculateAverage(student) ?? '—'} /></div><div className="table-wrap"><table><thead><tr><th>Evaluación</th><th>Calificación</th></tr></thead><tbody>{evaluations.map((key) => <tr key={key}><td>{evaluationLabels[key] ?? key}</td><td>{student.evaluaciones[key] ?? 'Pendiente'}</td></tr>)}<tr><td><strong>Promedio</strong></td><td><strong>{calculateAverage(student) ?? '—'}</strong></td></tr></tbody></table></div></> : <p>No hay materias registradas para este curso.</p>}</section>
 }
 
-export function StudentView({ section, username, name, course: profileCourse }: { section: string; username: string; name?: string; course?: string }) {
-  const student = useMemo(() => localStudent(username, name, profileCourse), [username, name, profileCourse])
+export function StudentView({ section, username, name, course: profileCourse, courseId, profileTeacherUsername }: { section: string; username: string; name?: string; course?: string; courseId?: string; profileTeacherUsername?: string }) {
+  const localProfile = useMemo(() => localStudent(username, name, profileCourse), [username, name, profileCourse])
+  const [firebaseStudent, setFirebaseStudent] = useState<Student | null>(null)
+  const [academic, setAcademic] = useState<Partial<Student> | null>(null)
+  useEffect(() => { void loadStudentFromFirebase(username).then(setFirebaseStudent).catch(() => setFirebaseStudent(null)) }, [username])
+  useEffect(() => {
+    const teacher = profileTeacherUsername ?? firebaseStudent?.teacherUsername
+    const id = courseId ?? firebaseStudent?.courseId
+    if (!teacher || !id) return undefined
+    void loadAcademicRecord(teacher, id, username).then(setAcademic).catch(() => setAcademic(null))
+    return undefined
+  }, [courseId, firebaseStudent?.courseId, firebaseStudent?.teacherUsername, profileTeacherUsername, username])
+  const student = { ...localProfile, ...(firebaseStudent ?? {}), ...(academic ?? {}) }
   const course = courses.find((item) => item.curso === profileCourse || item.curso === student.curso)
-  const teacherUsername = course?.teacherUsername
+  const teacherUsername = profileTeacherUsername ?? firebaseStudent?.teacherUsername ?? course?.teacherUsername
   const [messages, setMessages] = useState<TeacherMessage[]>([])
   const [messageText, setMessageText] = useState('')
   const [sentMessages, setSentMessages] = useState<TeacherMessage[]>([])

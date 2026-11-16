@@ -177,7 +177,7 @@ function App() {
     </main>
   )
 
-  const content = user.rol === 'Docente' ? <TeacherView section={section} teacherUsername={user.username} teacherName={user.nombre} /> : user.rol === 'Apoderado' ? <GuardianView section={section} username={user.username} /> : <StudentView section={section} username={user.username} name={user.nombre} course={user.curso} />
+  const content = user.rol === 'Docente' ? <TeacherView section={section} teacherUsername={user.username} teacherName={user.nombre} /> : user.rol === 'Apoderado' ? <GuardianView section={section} username={user.username} /> : <StudentView section={section} username={user.username} name={user.nombre} course={user.curso} courseId={user.courseId} profileTeacherUsername={user.teacherUsername} />
   return <PortalLayout user={user} active={section} onNavigate={setSection} onLogout={() => { void signOutUser(); setUser(null) }}>{content}</PortalLayout>
 }
 

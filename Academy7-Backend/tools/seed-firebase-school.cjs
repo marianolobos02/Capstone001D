@@ -74,8 +74,8 @@ async function removeStaleAcademyAccounts(accounts) {
   }
 }
 const schoolDays = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
-const morningSlots = ["08:00–08:40", "08:40–09:20", "09:30–10:10", "10:10–10:50", "10:50–11:30", "11:40–12:20", "12:20–13:00"];
-const afternoonSlots = ["13:00–13:40", "13:40–14:20", "14:30–15:10", "15:10–15:50", "15:50–16:30", "16:40–17:20", "17:20–18:00"];
+const morningSlots = ["08:00–08:40", "08:40–09:20", "09:20–10:00", "10:10–10:50", "10:50–11:30", "11:30–12:10", "12:20–13:00", "13:00–13:40", "13:40–14:20"];
+const afternoonSlots = ["12:20–13:00", "13:00–13:40", "13:40–14:20", "14:30–15:10", "15:10–15:50", "15:50–16:30", "16:40–17:20", "17:20–18:00", "18:00–18:40"];
 const schoolWindows = [[0, 1], [2, 4], [5, 6]];
 function scheduleSlotsForCourse(course) {
   const match = String(course.curso).match(/(\d+)° (Básico|Medio)/);
@@ -98,32 +98,57 @@ function buildSchedules(courses) {
   const teacherBusy = new Map();
   courses.forEach((course, courseIndex) => {
     const courseBusy = new Set();
+    let courseSessionIndex = 0;
     const schoolSlots = scheduleSlotsForCourse(course);
     course.asignaturas = course.asignaturas.flatMap((subject, subjectIndex) => {
       const teacherList = course.docentesPorAsignatura?.[subject] ?? [];
-      const teacherUsername = teacherList[(courseIndex + subjectIndex) % Math.max(teacherList.length, 1)] ?? course.teacherUsername;
-      const pattern = subjectIndex % 3;
-      const dayCounts = pattern === 0 ? [3, 1] : pattern === 1 ? [2, 2] : [4];
-      const teacherKeys = teacherBusy.get(teacherUsername) ?? new Set();
+      const teacherCandidates = [...teacherList].sort((a, b) => (teacherBusy.get(a)?.size ?? 0) - (teacherBusy.get(b)?.size ?? 0));
+      let teacherUsername = teacherCandidates[0] ?? course.teacherUsername;
+      // Matemática y Lenguaje tienen cuatro bloques semanales (2+2).
+      // Las demás asignaturas tienen dos bloques semanales en una sola sesión.
+      const isCoreSubject = subject === "Matemática" || subject === "Matematica" || subject === "Lenguaje" || subject === "Lenguaje y Comunicación";
+      const dayCounts = isCoreSubject ? [2, 2] : [2];
+        let teacherKeys = teacherBusy.get(teacherUsername) ?? new Set();
       const sessions = [];
       let sessionNumber = 0;
       for (let dayGroup = 0; dayGroup < dayCounts.length; dayGroup += 1) {
-        const dayIndex = (courseIndex + subjectIndex + dayGroup) % schoolDays.length;
+        const preferredDay = courseSessionIndex % schoolDays.length;
+        const preferredStart = courseSessionIndex >= schoolDays.length ? 2 : 0;
+        courseSessionIndex += 1;
         const blockCount = dayCounts[dayGroup]; let selected = null;
-        for (let offset = 0; offset <= schoolSlots.length - blockCount; offset += 1) {
-          const start = (courseIndex * 2 + subjectIndex + sessionNumber + offset) % (schoolSlots.length - blockCount + 1);
-          const keys = Array.from({ length: blockCount }, (_, block) => `${schoolDays[dayIndex]}|${schoolSlots[start + block]}`);
-          if (keys.every((key) => !courseBusy.has(key) && !teacherKeys.has(key))) { selected = { start, keys }; break; }
+        const dayOrder = Array.from({ length: schoolDays.length }, (_, offset) => (preferredDay + offset) % schoolDays.length);
+        const startCount = schoolSlots.length - blockCount + 1;
+        for (const dayIndex of dayOrder) {
+          for (let offset = 0; offset < startCount; offset += 1) {
+            const start = (preferredStart + offset) % startCount;
+            const keys = Array.from({ length: blockCount }, (_, block) => `${schoolDays[dayIndex]}|${schoolSlots[start + block]}`);
+            if (keys.every((key) => !courseBusy.has(key) && !teacherKeys.has(key))) { selected = { start, dayIndex, keys }; break; }
+          }
+          if (selected) break;
         }
-        if (!selected) throw new Error(`No hay bloque disponible para ${teacherUsername} en ${course.curso}`);
+        if (!selected) {
+          for (const alternateTeacher of teacherCandidates.filter((candidate) => candidate !== teacherUsername)) {
+            const alternateKeys = teacherBusy.get(alternateTeacher) ?? new Set();
+            for (const dayIndex of dayOrder) {
+              for (let offset = 0; offset < startCount; offset += 1) {
+                const start = (preferredStart + offset) % startCount;
+                const keys = Array.from({ length: blockCount }, (_, block) => `${schoolDays[dayIndex]}|${schoolSlots[start + block]}`);
+                if (keys.every((key) => !courseBusy.has(key) && !alternateKeys.has(key))) { selected = { start, dayIndex, keys }; teacherUsername = alternateTeacher; teacherKeys = alternateKeys; break; }
+              }
+              if (selected) break;
+            }
+            if (selected) break;
+          }
+        }
+        if (!selected) throw new Error(`No hay bloque disponible para ningún docente de ${subject} en ${course.curso}.`);
         selected.keys.forEach((key) => { teacherKeys.add(key); courseBusy.add(key); });
-        sessions.push({ asignatura: subject, teacherUsername, docente: teacherNames[teacherUsername === "asilva" ? 0 : Math.max(0, Number(String(teacherUsername).replace("docente", "")) - 1)] ?? teacherUsername, dia: schoolDays[dayIndex], hora: `${schoolSlots[selected.start]} · ${schoolSlots[selected.start + blockCount - 1]}`, sala: subject === "Educación Física" ? "Gimnasio" : course.sala, bloques: blockCount, bloqueSemanal: sessionNumber + 1, bloquesSemanales: 4 });
+        sessions.push({ asignatura: subject, teacherUsername, docente: teacherNames[teacherUsername === "asilva" ? 0 : Math.max(0, Number(String(teacherUsername).replace("docente", "")) - 1)] ?? teacherUsername, dia: schoolDays[selected.dayIndex], hora: `${schoolSlots[selected.start]} · ${schoolSlots[selected.start + blockCount - 1]}`, sala: subject === "Educación Física" ? "Gimnasio" : course.sala, bloques: blockCount, bloqueSemanal: sessionNumber + 1, bloquesSemanales: dayCounts.reduce((total, count) => total + count, 0) });
         sessionNumber += blockCount;
       }
       teacherBusy.set(teacherUsername, teacherKeys);
       return sessions;
     });
-    course.horario = scheduleSlotsForCourse(course) === morningSlots ? "Jornada mañana · 08:00–13:00 · 4 bloques semanales por curso · recreos de 10 minutos" : "Jornada tarde · 13:00–18:00 · 4 bloques semanales por curso · recreos de 10 minutos";
+    course.horario = scheduleSlotsForCourse(course) === morningSlots ? "Jornada mañana · 08:00–14:20 · bloques de 40 minutos · recreos de 10 minutos" : "Jornada tarde · 12:20–18:40 · bloques de 40 minutos · recreos de 10 minutos";
     course.teacherUsername = course.asignaturas[0]?.teacherUsername ?? course.teacherUsername;
   });
   return courses;
@@ -191,6 +216,9 @@ async function main() {
   finalizeAccountEmails(accounts);
   buildSchedules(courses);
   renameAccountsToEmailUsernames(accounts, courses, guardians);
+  const studentReferences = new Map();
+  courses.forEach((course) => course.students.forEach((student) => studentReferences.set(student.username, { courseId: course.id, teacherUsername: course.teacherUsername })));
+  accounts.forEach((account) => { if (account.rol === "Estudiante" && studentReferences.has(account.username)) Object.assign(account, studentReferences.get(account.username)); });
 
   const credentials = [];
   await removeStaleAcademyAccounts(accounts);
@@ -207,8 +235,8 @@ async function main() {
     if (emailUsername !== account.username) await db.collection("users").doc(emailUsername).set(profile, { merge: true });
     if (account.rol === "Apoderado") await db.collection("guardians").doc(account.username).set({ ...profile, children: account.children }, { merge: true });
     if (account.rol === "Apoderado" && emailUsername !== account.username) await db.collection("guardians").doc(emailUsername).set({ ...profile, children: account.children }, { merge: true });
-    if (account.rol === "Estudiante") await db.collection("students").doc(account.username).set({ ...profile, curso: account.curso, nivel: account.nivel }, { merge: true });
-    if (account.rol === "Estudiante" && emailUsername !== account.username) await db.collection("students").doc(emailUsername).set({ ...profile, curso: account.curso, nivel: account.nivel }, { merge: true });
+    if (account.rol === "Estudiante") await db.collection("students").doc(account.username).set({ ...profile, curso: account.curso, nivel: account.nivel, courseId: account.courseId, teacherUsername: account.teacherUsername }, { merge: true });
+    if (account.rol === "Estudiante" && emailUsername !== account.username) await db.collection("students").doc(emailUsername).set({ ...profile, curso: account.curso, nivel: account.nivel, courseId: account.courseId, teacherUsername: account.teacherUsername }, { merge: true });
     credentials.push(`${account.username},${account.email},${account.password},${account.rol}`);
     if ((accountIndex + 1) % 25 === 0 || accountIndex === accounts.length - 1) {
       console.log(`  Cuentas: ${accountIndex + 1}/${accounts.length} (${account.rol})`);
@@ -236,7 +264,8 @@ async function main() {
     let batch = db.batch(); let writes = 0;
     for (const student of course.students) {
       for (const courseRef of courseRefs) {
-        batch.set(courseRef.collection("students").doc(student.username), { username: student.username, nombre: student.nombre, promedio: null, asistencia: 0, amonestaciones: 0, evaluaciones: {}, warnings: [], updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+        const courseTeacherUsername = courseRef.parent.parent.id;
+        batch.set(courseRef.collection("students").doc(student.username), { username: student.username, nombre: student.nombre, courseId: course.id, teacherUsername: courseTeacherUsername, promedio: null, asistencia: 0, amonestaciones: 0, evaluaciones: {}, attendance: {}, attendanceJustifications: {}, warnings: [], updatedAt: FieldValue.serverTimestamp() }, { merge: true });
         writes += 1;
         if (writes === 400) { await batch.commit(); batch = db.batch(); writes = 0; }
       }

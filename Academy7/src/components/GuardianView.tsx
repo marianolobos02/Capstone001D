@@ -33,7 +33,7 @@ function getCourse(student: Student) {
 
 function getAssignments(student: Student): SubjectAssignment[] {
   const course = getCourse(student)
-  const assignments = course?.asignaturas ?? []
+  const assignments = student.schedule?.length ? student.schedule : course?.asignaturas ?? []
   const known = new Set(assignments.map((item) => item.asignatura))
   const fallbackTeacher = assignments.find((item) => item.docente)?.docente ?? 'Docente asignado'
   return [...assignments, ...subjectsForCourseLabel(student.curso).filter((subject) => !known.has(subject)).map((subject) => ({ asignatura: subject, teacherUsername: course?.teacherUsername ?? '', docente: fallbackTeacher, dia: 'Por asignar', hora: 'Por asignar', sala: 'Por asignar', bloques: 2 }))]

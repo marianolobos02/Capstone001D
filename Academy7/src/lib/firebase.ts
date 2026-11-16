@@ -1,7 +1,7 @@
 import { getApps, initializeApp } from 'firebase/app'
 import { getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth'
 import { addDoc, collection, doc, getDoc, getDocs, getFirestore, onSnapshot, query, serverTimestamp, setDoc, where } from 'firebase/firestore'
-import type { CalendarEvaluation, Course, ScheduleSession, Student, User } from '../types'
+import type { CalendarEvaluation, Course, ScheduleSession, Student, SubjectAssignment, User } from '../types'
 
 const firebaseConfig = {
   apiKey: 'AIzaSyCPMkIFZ0mloz5lHUdUx5w4UaOYD6wta0w',
@@ -54,18 +54,77 @@ export async function loadGuardianChildren(username: string): Promise<Student[]>
   if (!guardianSnapshot.exists()) return []
   const childIds = (guardianSnapshot.data().children ?? []) as string[]
   const snapshots = await Promise.all(childIds.map((childId) => getDoc(doc(firestore, 'students', childId))))
-  return snapshots.filter((snapshot) => snapshot.exists()).map((snapshot) => ({
-    username: snapshot.id,
-    nombre: String(snapshot.data().nombre ?? snapshot.id),
-    curso: String(snapshot.data().curso ?? ''),
-    nivel: String(snapshot.data().nivel ?? ''),
-    promedio: typeof snapshot.data().promedio === 'number' ? snapshot.data().promedio : null,
-    asistencia: Number(snapshot.data().asistencia ?? 0),
-    evaluaciones: (snapshot.data().evaluaciones ?? {}) as Record<string, number | ''>,
-    warnings: (snapshot.data().warnings ?? []) as Student['warnings'],
-    attendance: (snapshot.data().attendance ?? {}) as Student['attendance'],
-    attendanceJustifications: (snapshot.data().attendanceJustifications ?? {}) as Student['attendanceJustifications'],
+  return Promise.all(snapshots.filter((snapshot) => snapshot.exists()).map(async (snapshot) => {
+    const data = snapshot.data()
+    const academic = typeof data.teacherUsername === 'string' && typeof data.courseId === 'string'
+      ? await loadAcademicRecord(data.teacherUsername, data.courseId, snapshot.id)
+      : null
+    const schedule = typeof data.teacherUsername === 'string' && typeof data.courseId === 'string'
+      ? await loadCourseSchedule(data.teacherUsername, data.courseId)
+      : []
+    return {
+      username: snapshot.id,
+      nombre: String(data.nombre ?? snapshot.id),
+      curso: String(data.curso ?? ''),
+      nivel: String(data.nivel ?? ''),
+      courseId: typeof data.courseId === 'string' ? data.courseId : undefined,
+      teacherUsername: typeof data.teacherUsername === 'string' ? data.teacherUsername : undefined,
+      schedule,
+      promedio: academic?.promedio ?? (typeof data.promedio === 'number' ? data.promedio : null),
+      asistencia: academic?.asistencia ?? Number(data.asistencia ?? 0),
+      evaluaciones: academic?.evaluaciones ?? (data.evaluaciones ?? {}) as Record<string, number | ''>,
+      warnings: academic?.warnings ?? (data.warnings ?? []) as Student['warnings'],
+      attendance: academic?.attendance ?? (data.attendance ?? {}) as Student['attendance'],
+      attendanceJustifications: academic?.attendanceJustifications ?? (data.attendanceJustifications ?? {}) as Student['attendanceJustifications'],
+    }
   }))
+}
+
+export async function loadStudentFromFirebase(username: string): Promise<Student | null> {
+  const profileId = username.trim().toLowerCase().split('@')[0]
+  const snapshot = await getDoc(doc(firestore, 'students', profileId))
+  if (!snapshot.exists()) return null
+  const data = snapshot.data()
+  const academic = typeof data.teacherUsername === 'string' && typeof data.courseId === 'string'
+    ? await loadAcademicRecord(data.teacherUsername, data.courseId, profileId)
+    : null
+  const schedule = typeof data.teacherUsername === 'string' && typeof data.courseId === 'string'
+    ? await loadCourseSchedule(data.teacherUsername, data.courseId)
+    : []
+  return {
+    username: profileId,
+    nombre: String(data.nombre ?? profileId),
+    curso: String(data.curso ?? ''),
+    nivel: String(data.nivel ?? ''),
+    courseId: typeof data.courseId === 'string' ? data.courseId : undefined,
+    teacherUsername: typeof data.teacherUsername === 'string' ? data.teacherUsername : undefined,
+    schedule,
+    promedio: academic?.promedio ?? (typeof data.promedio === 'number' ? data.promedio : null),
+    asistencia: academic?.asistencia ?? Number(data.asistencia ?? 0),
+    evaluaciones: academic?.evaluaciones ?? (data.evaluaciones ?? {}) as Student['evaluaciones'],
+    warnings: academic?.warnings ?? (data.warnings ?? []) as Student['warnings'],
+    attendance: academic?.attendance ?? (data.attendance ?? {}) as Student['attendance'],
+    attendanceJustifications: academic?.attendanceJustifications ?? (data.attendanceJustifications ?? {}) as Student['attendanceJustifications'],
+  }
+}
+
+export async function loadAcademicRecord(teacherUsername: string, courseId: string, studentUsername: string): Promise<Partial<Student> | null> {
+  const snapshot = await getDoc(studentPath(teacherUsername, courseId, studentUsername))
+  if (!snapshot.exists()) return null
+  const data = snapshot.data()
+  return {
+    promedio: typeof data.promedio === 'number' ? data.promedio : null,
+    asistencia: Number(data.asistencia ?? 0),
+    evaluaciones: (data.evaluaciones ?? {}) as Student['evaluaciones'],
+    warnings: (data.warnings ?? []) as Student['warnings'],
+    attendance: (data.attendance ?? {}) as Student['attendance'],
+    attendanceJustifications: (data.attendanceJustifications ?? {}) as Student['attendanceJustifications'],
+  }
+}
+
+export async function loadCourseSchedule(teacherUsername: string, courseId: string): Promise<SubjectAssignment[]> {
+  const snapshot = await getDocs(query(collection(firestore, 'teachers', teacherUsername, 'schedule'), where('courseId', '==', courseId)))
+  return snapshot.docs.map((item) => item.data() as ScheduleSession).sort((a, b) => `${a.dia}|${a.hora}`.localeCompare(`${b.dia}|${b.hora}`))
 }
 
 function studentPath(teacherUsername: string, courseId: string, studentUsername: string) {

@@ -7,6 +7,9 @@ export type Student = {
   nombre: string
   curso: string
   nivel: string
+  courseId?: string
+  teacherUsername?: string
+  schedule?: SubjectAssignment[]
   promedio: number | null
   asistencia: number
   evaluaciones: Record<string, number | ''>
@@ -34,4 +37,4 @@ export type Course = {
   students: Student[]
   asignaturas: SubjectAssignment[]
 }
-export type User = { username: string; nombre: string; rol: Role; curso?: string; nivel?: string; children?: string[] }
+export type User = { username: string; nombre: string; rol: Role; curso?: string; nivel?: string; courseId?: string; teacherUsername?: string; children?: string[] }
