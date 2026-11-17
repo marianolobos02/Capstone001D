@@ -44,6 +44,11 @@ const legacy = new Map([
 ]);
 function slug(value) { return String(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24); }
 function initials(name) { return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase(); }
+function isStudentPortalEligible(nivel) {
+  const match = String(nivel || "").match(/(\d+)°\s*(Básico|Medio)/i);
+  if (!match) return false;
+  return match[2].toLowerCase() === "medio" || Number(match[1]) >= 7;
+}
 function alignChildSurname(childName, guardianName) { const child = String(childName || "").trim().split(/\s+/); const guardian = String(guardianName || "").trim().split(/\s+/); if (child.length < 4 || guardian.length < 4) return childName; const guardianIsMother = feminineFirstNames.includes(guardian[0]); const firstSurname = guardianIsMother ? child[2] : guardian[2]; const secondSurname = guardianIsMother ? guardian[3] : child[3]; return `${child[0]} ${child[1]} ${firstSurname} ${secondSurname}`; }
 function nameAt(index) { const masculine = index % 2 === 1; const firstPool = masculine ? masculineFirstNames : feminineFirstNames; const middlePool = masculine ? masculineMiddleNames : feminineMiddleNames; const poolIndex = Math.floor(index / 2); const firstIndex = poolIndex % firstPool.length; const middleIndex = Math.floor(poolIndex / firstPool.length) % middlePool.length; const lastIndex = (index * 17) % lastNames.length; const secondLastIndex = (Math.floor(index / lastNames.length) * 7 + index * 3) % secondLastNames.length; return `${firstPool[firstIndex]} ${middlePool[middleIndex]} ${lastNames[lastIndex]} ${secondLastNames[secondLastIndex]}`; }
 function teachersForLevel(level) { const cycle = level.label.includes("Básico") && Number(level.label.match(/\d+/)[0]) <= 4 ? 0 : level.label.includes("Básico") ? 14 : 30; const subjects = subjectsForLevel(level); return Object.fromEntries(subjects.map((subject, index) => [subject, [`docente${String(cycle + index * 2 + 1).padStart(2, "0")}`, `docente${String(cycle + index * 2 + 2).padStart(2, "0")}`]])); }
@@ -212,7 +217,9 @@ async function main() {
     const child = studentsByUsername.get(childUsername);
     if (child) child.nombre = alignChildSurname(child.nombre, guardian.nombre);
   }));
-  accounts.push(...uniqueStudents, ...guardians);
+  // Solo los estudiantes desde 7° básico tienen cuenta propia. Los demás conservan sus datos académicos para el apoderado.
+  const studentPortalAccounts = uniqueStudents.filter((student) => isStudentPortalEligible(student.nivel));
+  accounts.push(...studentPortalAccounts, ...guardians);
   finalizeAccountEmails(accounts);
   buildSchedules(courses);
   renameAccountsToEmailUsernames(accounts, courses, guardians);
@@ -223,7 +230,33 @@ async function main() {
   const credentials = [];
   await removeStaleAcademyAccounts(accounts);
   console.log(`Inicio de sincronización: ${accounts.length} cuentas y ${courses.length} cursos.`);
+  console.log(`Estudiantes sin cuenta propia, visibles para apoderados: ${uniqueStudents.length - studentPortalAccounts.length}`);
   console.log("[1/2] Procesando Authentication y perfiles de usuarios...");
+  for (const student of uniqueStudents.filter((item) => !isStudentPortalEligible(item.nivel))) {
+    const reference = studentReferences.get(student.username);
+    const existing = await db.collection("students").doc(student.username).get();
+    const previous = existing.exists ? existing.data() : {};
+    await db.collection("students").doc(student.username).set({
+      username: student.username,
+      nombre: student.nombre,
+      rol: "Estudiante",
+      curso: student.curso,
+      nivel: student.nivel,
+      courseId: reference?.courseId,
+      teacherUsername: reference?.teacherUsername,
+      uid: FieldValue.delete(),
+      correo: FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true });
+    await db.collection("users").doc(student.username).delete();
+    await db.collection("loginAliases").doc(student.username).delete();
+    if (previous.correo) await db.collection("loginAliases").where("email", "==", previous.correo).get().then(async (snapshot) => {
+      const batch = db.batch();
+      snapshot.docs.forEach((item) => batch.delete(item.ref));
+      if (!snapshot.empty) await batch.commit();
+    });
+  }
+
   for (let accountIndex = 0; accountIndex < accounts.length; accountIndex += 1) {
     const account = accounts[accountIndex];
     const user = await createOrUpdateUser(account);

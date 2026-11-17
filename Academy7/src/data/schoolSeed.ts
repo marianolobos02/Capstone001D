@@ -108,13 +108,14 @@ for (let level = 1; level <= 4; level += 1) for (const letter of ['A', 'B', 'C']
 
 const guardianName = 'Diego Andrés Figueroa Orellana'
 const firstChild = allStudents[0]
+const studentPortalDemo = allStudents.find((student) => ['7° Básico', '8° Básico', '1° Medio', '2° Medio', '3° Medio', '4° Medio'].includes(student.nivel))
 if (firstChild) firstChild.nombre = alignChildSurname(firstChild.nombre, guardianName)
 if (firstChild) firstChild.nombre = `${firstChild.nombre.split(/\s+/).slice(0, 2).join(' ')} Figueroa ${firstChild.nombre.split(/\s+/)[3]}`
 
 export const users: User[] = [
   { username: 'asilva', nombre: teacherNames[0], rol: 'Docente' },
   { username: 'apoderado0001', nombre: guardianName, rol: 'Apoderado', children: firstChild ? [firstChild.username] : [] },
-  { username: firstChild?.username ?? 'est0001', nombre: firstChild?.nombre ?? '', rol: 'Estudiante', curso: firstChild?.curso, nivel: firstChild?.nivel },
+  { username: studentPortalDemo?.username ?? 'est0001', nombre: studentPortalDemo?.nombre ?? '', rol: 'Estudiante', curso: studentPortalDemo?.curso, nivel: studentPortalDemo?.nivel },
 ]
 
 export function getUser(username: string) { return users.find((user) => user.username === username) ?? users[0] }

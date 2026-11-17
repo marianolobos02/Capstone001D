@@ -60,6 +60,8 @@ function App() {
       setSection('Inicio')
       setLoginError('')
     } catch {
+      await signOutUser().catch(() => undefined)
+      setUser(null)
       setLoginError('No se pudo iniciar sesión o el perfil no está autorizado. Verifica tus credenciales.')
     } finally {
       setIsSubmitting(false)

@@ -6,47 +6,80 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isTeacher(String teacherId) {
-      return signedIn() && request.auth.token.email == teacherId + '@academy7.cl';
+    function authUsername() {
+      return request.auth.token.email.split('@')[0];
     }
 
-    // Cada usuario puede consultar su perfil. La carga administrativa se hace
-    // con Firebase Admin SDK, nunca con una clave privada en el navegador.
+    function isSelf(username) {
+      return signedIn() && authUsername() == username;
+    }
+
+    function isTeacher(teacherId) {
+      return isSelf(teacherId);
+    }
+
+    function isGuardianOf(studentId) {
+      return signedIn()
+        && get(/databases/$(database)/documents/guardians/$(authUsername())).data.children.hasAny([studentId]);
+    }
+
+    function isAcademicRecordViewer(teacherId, studentId) {
+      return isTeacher(teacherId) || isSelf(studentId) || isGuardianOf(studentId);
+    }
+
+    function messageRecipientViewer(teacherId) {
+      return isTeacher(teacherId)
+        || (isSelf(resource.data.recipientUsername)
+          && (resource.data.audience == 'guardian' || resource.data.audience == 'both'))
+        || (resource.data.recipientUsername == 'all-guardians'
+          && get(/databases/$(database)/documents/users/$(authUsername())).data.rol == 'Apoderado')
+        || (resource.data.recipientUsername == 'all-both'
+          && get(/databases/$(database)/documents/users/$(authUsername())).data.rol in ['Apoderado', 'Estudiante'])
+        || (resource.data.recipientUsername == 'all-students'
+          && get(/databases/$(database)/documents/users/$(authUsername())).data.rol == 'Estudiante')
+        || (isSelf(resource.data.recipientUsername)
+          && resource.data.audience == 'student');
+    }
+
+    function messageSenderAllowed(teacherId) {
+      return signedIn()
+        && request.resource.data.senderUsername == authUsername()
+        && request.resource.data.recipientUsername == teacherId
+        && ((get(/databases/$(database)/documents/users/$(authUsername())).data.rol == 'Estudiante'
+          && request.resource.data.audience == 'student')
+          || (get(/databases/$(database)/documents/users/$(authUsername())).data.rol == 'Apoderado'
+          && request.resource.data.audience == 'guardian'));
+    }
+
     match /users/{username} {
-      allow read: if signedIn() && request.auth.token.email == username + '@academy7.cl';
-      allow write: if false;
-    }
-
-    match /students/{username} {
-      allow read: if signedIn() && request.auth.token.email == username + '@academy7.cl';
+      allow read: if isSelf(username);
       allow write: if false;
     }
 
     match /guardians/{username} {
-      allow read: if signedIn() && request.auth.token.email == username + '@academy7.cl';
+      allow read: if isSelf(username);
       allow write: if false;
     }
 
-    // Las cuentas autenticadas pueden consultar cursos y estudiantes para
-    // construir sus paneles. Solo el docente dueño puede modificar registros.
+    match /students/{username} {
+      allow read: if isSelf(username) || isGuardianOf(username);
+      allow write: if false;
+    }
+
     match /teachers/{teacherId}/courses/{courseId} {
       allow read: if signedIn();
       allow create, update, delete: if isTeacher(teacherId);
 
       match /students/{studentId} {
-        allow read: if signedIn();
-        allow create, update, delete: if isTeacher(teacherId);
-      }
-
-      match /attendance/{sessionId} {
-        allow read: if signedIn();
+        allow read: if isAcademicRecordViewer(teacherId, studentId);
         allow create, update, delete: if isTeacher(teacherId);
       }
     }
 
     match /teachers/{teacherId}/messages/{messageId} {
-      allow read: if signedIn();
-      allow create, update, delete: if isTeacher(teacherId);
+      allow read: if messageRecipientViewer(teacherId);
+      allow create: if isTeacher(teacherId) || messageSenderAllowed(teacherId);
+      allow update, delete: if isTeacher(teacherId);
     }
 
     match /{document=**} {

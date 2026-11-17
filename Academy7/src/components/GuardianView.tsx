@@ -86,6 +86,10 @@ function ChildDetail({ student, onBack }: { student: Student; onBack: () => void
         <p className="muted">El porcentaje se calcula con las asistencias registradas para este estudiante.</p>
       </section>
       <section className="panel">
+        <div className="section-title-row"><div><span className="eyebrow">Asistencia</span><h3>Registro diario</h3></div></div>
+        {Object.entries(student.attendance).sort(([a], [b]) => b.localeCompare(a)).length ? <div className="table-wrap"><table><thead><tr><th>Fecha</th><th>Estado</th><th>Justificativo</th></tr></thead><tbody>{Object.entries(student.attendance).sort(([a], [b]) => b.localeCompare(a)).map(([date, status]) => <tr key={date}><td>{date}</td><td><strong>{status}</strong></td><td>{student.attendanceJustifications[date] || '—'}</td></tr>)}</tbody></table></div> : <p className="muted">No hay registros diarios de asistencia.</p>}
+      </section>
+      <section className="panel">
         <div className="section-title-row"><div><span className="eyebrow">Agenda académica</span><h3>Calendario de evaluaciones</h3></div></div>
         {(() => { const events = calendarEventsForCourse(student.curso, 0, assignments.map((item) => item.asignatura)).slice(0, 8); return events.length ? <div className="calendar-list">{events.map((event, index) => <article className="calendar-event" key={`${event.key}-${event.date}-${index}`}><strong>{event.subject ?? event.key}</strong><span>{formatDate(event.date)}</span></article>)}</div> : <p className="muted">No hay evaluaciones próximas.</p> })()}
       </section>

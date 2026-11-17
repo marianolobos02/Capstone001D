@@ -1,7 +1,7 @@
 import { getApps, initializeApp } from 'firebase/app'
 import { getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth'
 import { addDoc, collection, doc, getDoc, getDocs, getFirestore, onSnapshot, query, serverTimestamp, setDoc, where } from 'firebase/firestore'
-import type { CalendarEvaluation, Course, ScheduleSession, Student, SubjectAssignment, User } from '../types'
+import type { Course, Student, User } from '../types'
 
 const firebaseConfig = {
   apiKey: 'AIzaSyCPMkIFZ0mloz5lHUdUx5w4UaOYD6wta0w',
@@ -43,7 +43,11 @@ export async function loadAuthenticatedProfile(username: string): Promise<User> 
   }
   if (profile.rol === 'Estudiante') {
     const studentSnapshot = await getDoc(doc(firestore, 'students', profileId))
-    return { ...profile, ...(studentSnapshot.exists() ? studentSnapshot.data() : {}) } as User
+    const studentProfile = { ...profile, ...(studentSnapshot.exists() ? studentSnapshot.data() : {}) } as User
+    if (!isEligibleStudentLevel(studentProfile.nivel ?? studentProfile.curso)) {
+      throw new Error('La vista de estudiante está disponible desde 7° básico.')
+    }
+    return studentProfile
   }
   return profile
 }
@@ -59,9 +63,6 @@ export async function loadGuardianChildren(username: string): Promise<Student[]>
     const academic = typeof data.teacherUsername === 'string' && typeof data.courseId === 'string'
       ? await loadAcademicRecord(data.teacherUsername, data.courseId, snapshot.id)
       : null
-    const schedule = typeof data.teacherUsername === 'string' && typeof data.courseId === 'string'
-      ? await loadCourseSchedule(data.teacherUsername, data.courseId)
-      : []
     return {
       username: snapshot.id,
       nombre: String(data.nombre ?? snapshot.id),
@@ -69,7 +70,7 @@ export async function loadGuardianChildren(username: string): Promise<Student[]>
       nivel: String(data.nivel ?? ''),
       courseId: typeof data.courseId === 'string' ? data.courseId : undefined,
       teacherUsername: typeof data.teacherUsername === 'string' ? data.teacherUsername : undefined,
-      schedule,
+      schedule: [],
       promedio: academic?.promedio ?? (typeof data.promedio === 'number' ? data.promedio : null),
       asistencia: academic?.asistencia ?? Number(data.asistencia ?? 0),
       evaluaciones: academic?.evaluaciones ?? (data.evaluaciones ?? {}) as Record<string, number | ''>,
@@ -88,9 +89,6 @@ export async function loadStudentFromFirebase(username: string): Promise<Student
   const academic = typeof data.teacherUsername === 'string' && typeof data.courseId === 'string'
     ? await loadAcademicRecord(data.teacherUsername, data.courseId, profileId)
     : null
-  const schedule = typeof data.teacherUsername === 'string' && typeof data.courseId === 'string'
-    ? await loadCourseSchedule(data.teacherUsername, data.courseId)
-    : []
   return {
     username: profileId,
     nombre: String(data.nombre ?? profileId),
@@ -98,7 +96,7 @@ export async function loadStudentFromFirebase(username: string): Promise<Student
     nivel: String(data.nivel ?? ''),
     courseId: typeof data.courseId === 'string' ? data.courseId : undefined,
     teacherUsername: typeof data.teacherUsername === 'string' ? data.teacherUsername : undefined,
-    schedule,
+    schedule: [],
     promedio: academic?.promedio ?? (typeof data.promedio === 'number' ? data.promedio : null),
     asistencia: academic?.asistencia ?? Number(data.asistencia ?? 0),
     evaluaciones: academic?.evaluaciones ?? (data.evaluaciones ?? {}) as Student['evaluaciones'],
@@ -106,6 +104,13 @@ export async function loadStudentFromFirebase(username: string): Promise<Student
     attendance: academic?.attendance ?? (data.attendance ?? {}) as Student['attendance'],
     attendanceJustifications: academic?.attendanceJustifications ?? (data.attendanceJustifications ?? {}) as Student['attendanceJustifications'],
   }
+}
+
+export function isEligibleStudentLevel(levelOrCourse: string | undefined) {
+  const match = levelOrCourse?.match(/(\d+)°\s*(Básico|Medio)/i)
+  if (!match) return false
+  const level = Number(match[1])
+  return match[2].toLowerCase() === 'medio' || level >= 7
 }
 
 export async function loadAcademicRecord(teacherUsername: string, courseId: string, studentUsername: string): Promise<Partial<Student> | null> {
@@ -120,11 +125,6 @@ export async function loadAcademicRecord(teacherUsername: string, courseId: stri
     attendance: (data.attendance ?? {}) as Student['attendance'],
     attendanceJustifications: (data.attendanceJustifications ?? {}) as Student['attendanceJustifications'],
   }
-}
-
-export async function loadCourseSchedule(teacherUsername: string, courseId: string): Promise<SubjectAssignment[]> {
-  const snapshot = await getDocs(query(collection(firestore, 'teachers', teacherUsername, 'schedule'), where('courseId', '==', courseId)))
-  return snapshot.docs.map((item) => item.data() as ScheduleSession).sort((a, b) => `${a.dia}|${a.hora}`.localeCompare(`${b.dia}|${b.hora}`))
 }
 
 function studentPath(teacherUsername: string, courseId: string, studentUsername: string) {
@@ -154,18 +154,6 @@ export async function saveStudentToFirebase(teacherUsername: string, courseId: s
     amonestaciones: student.warnings.length,
     updatedAt: serverTimestamp(),
   }, { merge: true })
-}
-
-export function listenTeacherSchedule(teacherUsername: string, onSchedule: (sessions: ScheduleSession[]) => void) {
-  return onSnapshot(collection(firestore, 'teachers', teacherUsername, 'schedule'), (snapshot) => {
-    onSchedule(snapshot.docs.map((item) => item.data() as ScheduleSession).sort((a, b) => `${a.dia}|${a.hora}`.localeCompare(`${b.dia}|${b.hora}`)))
-  })
-}
-
-export function listenTeacherCalendar(teacherUsername: string, onCalendar: (events: CalendarEvaluation[]) => void) {
-  return onSnapshot(collection(firestore, 'teachers', teacherUsername, 'calendar'), (snapshot) => {
-    onCalendar(snapshot.docs.map((item) => item.data() as CalendarEvaluation).sort((a, b) => a.date.localeCompare(b.date)))
-  })
 }
 
 export type TeacherMessage = { id: string; senderUsername: string; recipientUsername?: string; audience: 'student' | 'guardian' | 'both'; text: string; createdAt?: unknown }

@@ -24,14 +24,6 @@ service cloud.firestore {
       }
       match /attendance/{sessionId} { allow read, write: if isTeacher(teacherId); }
     }
-    match /teachers/{teacherId}/schedule/{sessionId} {
-      allow read: if isTeacher(teacherId) || hasRole('Estudiante') || hasRole('Apoderado');
-      allow write: if isTeacher(teacherId);
-    }
-    match /teachers/{teacherId}/calendar/{eventId} {
-      allow read: if isTeacher(teacherId);
-      allow write: if isTeacher(teacherId);
-    }
     match /teachers/{teacherId}/messages/{messageId} {
       allow create: if isTeacher(teacherId)
         || (hasRole('Estudiante') && request.resource.data.senderUsername == username() && request.resource.data.recipientUsername == teacherId && request.resource.data.audience == 'student')
