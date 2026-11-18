@@ -22,6 +22,7 @@ export type SubjectAssignment = {
   teacherUsername: string
   docente: string
   dia: string
+  jornada?: 'morning' | 'afternoon'
   hora: string
   sala: string
   bloques?: number

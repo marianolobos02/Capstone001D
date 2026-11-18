@@ -4,6 +4,7 @@ import { listenTeacherMessages, loadAcademicRecord, loadStudentFromFirebase, sen
 import type { TeacherMessage } from '../lib/firebase'
 import type { Course, Student } from '../types'
 import { Stat } from './PortalLayout'
+import { ScheduleTable } from './ScheduleTable'
 
 const evaluationLabels: Record<string, string> = { semestre1Prueba1: '1° semestre · Prueba 1', semestre1Prueba2: '1° semestre · Prueba 2', semestre1Prueba3: '1° semestre · Prueba 3', semestre1Global: '1° semestre · Global', semestre2Prueba1: '2° semestre · Prueba 1', semestre2Prueba2: '2° semestre · Prueba 2', semestre2Prueba3: '2° semestre · Prueba 3', semestre2Global: '2° semestre · Global', examen: 'Examen' }
 
@@ -18,7 +19,7 @@ function Home({ student, course }: { student: Student; course?: Course }) {
   return <>
     <div className="hero student"><div><span className="eyebrow">Panel del estudiante</span><h1>Hola, {student.nombre.split(' ')[0]}</h1><p>{student.nombre} · {student.curso}</p></div></div>
     <div className="stats"><Stat label="Promedio general" value={calculateAverage(student) ?? '—'} /><Stat label="Asistencia" value={`${calculateAttendance(student)}%`} /><Stat label="Amonestaciones" value={student.warnings.length} /></div>
-    <section className="panel"><span className="eyebrow">Horario escolar</span><h2>Mis clases</h2>{assignments.length ? <div className="schedule-grid">{['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'].map((day) => <article className="schedule-card" key={day}><h3>{day}</h3>{assignments.filter((item) => item.dia === day).map((item) => <div className="schedule-session" key={`${item.asignatura}-${item.hora}`}><strong>{item.hora} · {item.asignatura}</strong><span>{item.docente}</span><small>{item.sala}</small></div>)}{!assignments.some((item) => item.dia === day) && <small>Sin clases asignadas</small>}</article>)}</div> : <p className="muted">El horario aparecerá cuando el seed termine y se carguen las asignaturas.</p>}</section>
+    <section className="panel"><span className="eyebrow">Horario escolar</span><h2>Mis clases</h2>{assignments.length ? <ScheduleTable assignments={assignments} emptyMessage="El horario aparecerá cuando el seed termine y se carguen las asignaturas." showTeacher /> : <p className="muted">El horario aparecerá cuando el seed termine y se carguen las asignaturas.</p>}</section>
     <section className="panel"><span className="eyebrow">Agenda académica</span><h2>Evaluaciones</h2>{events.map((event, index) => <div className="calendar-event" key={`${event.key}-${event.subject ?? index}`}><strong>{evaluationLabels[event.key] ?? event.key}{event.subject ? ` · ${event.subject}` : ''}</strong><span>{new Date(`${event.date}T12:00:00`).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span></div>)}</section>
   </>
 }

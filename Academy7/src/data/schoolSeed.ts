@@ -29,8 +29,6 @@ const femaleMiddleNames = ['Antonia', 'Belén', 'Carolina', 'Elena', 'Isidora', 
 const maleMiddleNames = ['Andrés', 'Benjamín', 'Camilo', 'Cristóbal', 'Daniel', 'Felipe', 'Ignacio', 'Javier', 'José', 'Manuel', 'Sebastián', 'Vicente', 'Alejandro', 'Tomás', 'Matías']
 const teacherNames = ['Andrea Fernanda Silva Araya', 'Ricardo Andrés Peña Muñoz', 'Camila Belén Torres Rojas', 'Marco Antonio Iturra Soto', 'Laura Sofía Bennett Jara', 'Diego Alejandro Fuentes Vera', 'Paula Carolina Díaz Lagos', 'Tomás Ignacio Vera Paredes', 'Elisa María Muñoz Reyes', 'Nicolás Javier Reyes Silva', 'Sofía Valentina León Morales', 'Carolina Paz Vidal Aravena', 'Felipe Andrés Contreras Soto', 'Javiera Belén González Rojas', 'Matías Ignacio Herrera Díaz', 'Daniela Fernanda Paredes Lara', 'Gabriel Antonio Espinoza Campos', 'Constanza María Sepúlveda Vera', 'Sebastián José Castillo Pérez', 'Antonia Paz Fuentes Araya', 'Rodrigo Andrés Martínez Silva', 'Fernanda Carolina Riquelme Soto', 'Joaquín Manuel Salazar Reyes', 'Valentina Sofía Navarro Díaz', 'Esteban Felipe Carrasco Muñoz', 'Isidora Belén Vargas Rojas', 'Cristóbal Andrés Poblete Jara', 'Renata María Ortega Vera', 'Manuel Alejandro Tapia Lagos', 'Josefina Paz Cornejo Silva', 'Samuel Ignacio Gallardo Paredes', 'Catalina Fernanda Leiva Morales', 'Ignacio José Bustos Araya', 'Florencia Belén Maldonado Soto', 'Benjamín Andrés Ramírez Reyes', 'María José Figueroa Díaz', 'Vicente Tomás Garrido Lara', 'Agustina Sofía Donoso Muñoz', 'Alejandro Javier Cisternas Rojas', 'Emilia Paz Valdés Vera', 'Juan Pablo Vega Aravena', 'Martina Carolina Sanhueza Silva', 'Lucas Andrés Toledo Campos', 'Daniela Paz Núñez Reyes', 'Maximiliano José Vargas Soto', 'Gabriela Fernanda Herrera Lagos', 'Pablo Ignacio Pavez Morales', 'Trinidad María Escobar Riquelme']
 const weekdays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
-const morningSlots = ['08:00–08:40', '08:40–09:20', '09:30–10:10', '10:10–10:50', '10:50–11:30', '11:40–12:20', '12:20–13:00']
-const afternoonSlots = ['13:00–13:40', '13:40–14:20', '14:30–15:10', '15:10–15:50', '15:50–16:30', '16:40–17:20', '17:20–18:00']
 function subjectsForLevel(level: number, medium = false) {
   if (medium) return ['Matemática', 'Lenguaje', 'Historia', 'Filosofía', 'Inglés', 'Ciencias', 'Educación Física', 'Geometría', 'Música']
   if (level <= 4) return ['Matemática', 'Lenguaje y Comunicación', 'Ciencias Naturales', 'Historia', 'Inglés', 'Educación Física', 'Artes Visuales']
@@ -38,44 +36,90 @@ function subjectsForLevel(level: number, medium = false) {
 }
 export function subjectsForCourseLabel(courseLabel: string) { const match = courseLabel.match(/(\d+)° (Básico|Medio)/); return subjectsForLevel(Number(match?.[1] ?? 1), match?.[2] === 'Medio') }
 function teacherCycle(level: number, medium: boolean) { return medium ? 30 : level <= 4 ? 0 : 14 }
-const localTeacherBusy = new Map<string, Set<string>>()
+type Journey = 'morning' | 'afternoon'
+const journeySegments = [[0, 1, 2], [3, 4, 5], [6, 7, 8]]
+
+function courseJourney(level: number, medium: boolean): Journey {
+  return (!medium && level >= 5) || (medium && level >= 3) ? 'morning' : 'afternoon'
+}
+
+function subjectGroups(subject: string): number[] {
+  if (subject === 'Matemática' || subject === 'Lenguaje' || subject === 'Lenguaje y Comunicación') return [3, 3, 2, 2]
+  if (subject === 'Ciencias Naturales' || subject === 'Historia' || subject === 'Ciencias') return [2, 2, 2]
+  if (subject === 'Educación Física') return [3]
+  if (subject === 'Inglés') return [2, 2]
+  return [2]
+}
+
+function subjectPriority(subject: string) {
+  if (subject === 'Matemática' || subject === 'Lenguaje' || subject === 'Lenguaje y Comunicación') return 0
+  if (subject === 'Ciencias Naturales' || subject === 'Ciencias' || subject === 'Historia') return 1
+  if (subject === 'Educación Física') return 2
+  if (subject === 'Inglés') return 3
+  return 4
+}
+
 function makeAssignments(level: number, letter: string, medium = false, courseIndex = 0): SubjectAssignment[] {
   const cycle = teacherCycle(level, medium)
   const classOffset = letter.charCodeAt(0) - 65
+  const journey = courseJourney(level, medium)
+  const timeSlots = journey === 'morning'
+    ? ['08:00–08:40', '08:40–09:20', '09:20–10:00', '10:10–10:50', '10:50–11:30', '11:30–12:10', '12:20–13:00', '13:00–13:40', '13:40–14:20']
+    : ['12:20–13:00', '13:00–13:40', '13:40–14:20', '14:30–15:10', '15:10–15:50', '15:50–16:30', '16:40–17:20', '17:20–18:00', '18:00–18:40']
   const courseBusy = new Set<string>()
-  return subjectsForLevel(level, medium).flatMap((asignatura, index) => {
+  const subjects = subjectsForLevel(level, medium).sort((a, b) => subjectPriority(a) - subjectPriority(b))
+  return subjects.flatMap((asignatura, index) => {
     const teacherIndex = cycle + index * 2 + (classOffset % 2)
     const teacherUsername = teacherIndex === 0 ? 'asilva' : `docente${String(teacherIndex + 1).padStart(2, '0')}`
-    const isMorning = (!medium && level >= 5) || (medium && level >= 3)
-    const timeSlots = isMorning ? morningSlots : afternoonSlots
     const sala = asignatura === 'Educación Física' ? 'Gimnasio' : `Sala ${1 + ((index + classOffset) % 5)}`
-    const teacherBusy = localTeacherBusy.get(teacherUsername) ?? new Set<string>()
-    const pattern = index % 3
-    const dayCounts = pattern === 0 ? [3, 1] : pattern === 1 ? [2, 2] : [4]
     const sessions: SubjectAssignment[] = []
-    let sessionNumber = 0
-    for (let dayGroup = 0; dayGroup < dayCounts.length; dayGroup += 1) {
-      const dayIndex = (courseIndex + index + dayGroup) % weekdays.length
-      const blockCount = dayCounts[dayGroup]
-      let start = -1
-      for (let offset = 0; offset <= timeSlots.length - blockCount; offset += 1) {
-        const candidate = (courseIndex * 2 + index + sessionNumber + offset) % (timeSlots.length - blockCount + 1)
-        const keys = Array.from({ length: blockCount }, (_, block) => `${weekdays[dayIndex]}|${timeSlots[candidate + block]}`)
-        if (keys.every((key) => !courseBusy.has(key) && !teacherBusy.has(key))) { start = candidate; keys.forEach((key) => { teacherBusy.add(key); courseBusy.add(key) }); break }
+    const usedDays = new Set<number>()
+    const subjectDayBlocks = new Map<number, number>()
+    subjectGroups(asignatura).forEach((blockCount, groupIndex) => {
+      const dayCandidates = weekdays.map((_, dayIndex) => (courseIndex + index * 2 + groupIndex + dayIndex) % weekdays.length)
+        .filter((dayIndex) => !usedDays.has(dayIndex))
+        .concat(weekdays.map((_, dayIndex) => dayIndex).filter((dayIndex) => usedDays.has(dayIndex)))
+      let placement: { dayIndex: number; start: number } | undefined
+      for (const dayIndex of dayCandidates) {
+        for (const segment of journeySegments) {
+          for (const startOffset of [0, 1]) {
+            const start = segment[0] + startOffset
+            if (start + blockCount > segment[2] + 1) continue
+            const keys = Array.from({ length: blockCount }, (_, block) => `${weekdays[dayIndex]}|${timeSlots[start + block]}`)
+            const dayBlocks = subjectDayBlocks.get(dayIndex) ?? 0
+            if (dayBlocks + blockCount <= 3 && keys.every((key) => !courseBusy.has(key))) {
+              placement = { dayIndex, start }
+              keys.forEach((key) => courseBusy.add(key))
+              break
+            }
+          }
+          if (placement) break
+        }
+        if (placement) break
       }
-      if (start >= 0) sessions.push({ asignatura, teacherUsername, docente: teacherNames[teacherIndex] ?? `Docente ${teacherUsername}`, dia: weekdays[dayIndex], hora: `${timeSlots[start]} · ${timeSlots[start + blockCount - 1]}`, sala, bloques: blockCount })
-      sessionNumber += blockCount
-    }
-    if (!sessions.length) {
-      const fallbackDay = weekdays[(courseIndex + index) % weekdays.length]
-      const fallbackStart = Math.max(0, Math.min(timeSlots.length - 2, (courseIndex + index) % Math.max(1, timeSlots.length - 1)))
-      const fallbackKeys = [`${fallbackDay}|${timeSlots[fallbackStart]}`, `${fallbackDay}|${timeSlots[fallbackStart + 1]}`]
-      if (fallbackKeys.every((key) => !courseBusy.has(key) && !teacherBusy.has(key))) {
-        fallbackKeys.forEach((key) => { courseBusy.add(key); teacherBusy.add(key) })
-        sessions.push({ asignatura, teacherUsername, docente: teacherNames[teacherIndex] ?? `Docente ${teacherUsername}`, dia: fallbackDay, hora: `${timeSlots[fallbackStart]} · ${timeSlots[fallbackStart + 1]}`, sala, bloques: 2 })
+      if (placement) {
+        usedDays.add(placement.dayIndex)
+        subjectDayBlocks.set(placement.dayIndex, (subjectDayBlocks.get(placement.dayIndex) ?? 0) + blockCount)
+        sessions.push({ asignatura, teacherUsername, docente: teacherNames[teacherIndex] ?? `Docente ${teacherUsername}`, dia: weekdays[placement.dayIndex], jornada: journey, hora: `${timeSlots[placement.start]} · ${timeSlots[placement.start + blockCount - 1]}`, sala, bloques: blockCount })
+      } else {
+        for (let block = 0; block < blockCount; block += 1) {
+          let fallback: { dayIndex: number; start: number } | undefined
+          for (let dayOffset = 0; dayOffset < weekdays.length && !fallback; dayOffset += 1) {
+            const dayIndex = (courseIndex + index + groupIndex + dayOffset) % weekdays.length
+            if ((subjectDayBlocks.get(dayIndex) ?? 0) > 0) continue
+            for (let start = 0; start < timeSlots.length; start += 1) {
+              const key = `${weekdays[dayIndex]}|${timeSlots[start]}`
+              if (!courseBusy.has(key)) { fallback = { dayIndex, start }; break }
+            }
+          }
+          if (!fallback) break
+          const key = `${weekdays[fallback.dayIndex]}|${timeSlots[fallback.start]}`
+          courseBusy.add(key)
+          subjectDayBlocks.set(fallback.dayIndex, (subjectDayBlocks.get(fallback.dayIndex) ?? 0) + 1)
+          sessions.push({ asignatura, teacherUsername, docente: teacherNames[teacherIndex] ?? `Docente ${teacherUsername}`, dia: weekdays[fallback.dayIndex], jornada: journey, hora: `${timeSlots[fallback.start]} · ${timeSlots[fallback.start]}`, sala, bloques: 1 })
+        }
       }
-    }
-    localTeacherBusy.set(teacherUsername, teacherBusy)
+    })
     return sessions
   })
 }

@@ -4,6 +4,7 @@ import { listenTeacherMessages, loadGuardianChildren, sendMessageToTeacher } fro
 import type { TeacherMessage } from '../lib/firebase'
 import type { Student, SubjectAssignment } from '../types'
 import { Stat } from './PortalLayout'
+import { ScheduleTable } from './ScheduleTable'
 
 type GuardianProps = { section: string; username: string }
 
@@ -75,7 +76,7 @@ function ChildDetail({ student, onBack }: { student: Student; onBack: () => void
       </section>
       <section className="panel">
         <div className="section-title-row"><div><span className="eyebrow">Asignaturas</span><h3>Horario del estudiante</h3></div></div>
-        {assignments.length ? <div className="table-wrap"><table><thead><tr><th>Asignatura</th><th>Docente</th><th>Día</th><th>Hora</th><th>Sala</th></tr></thead><tbody>{assignments.map((item, index) => <tr key={`${item.asignatura}-${item.dia}-${index}`}><td><strong>{item.asignatura}</strong></td><td>{item.docente}</td><td>{item.dia}</td><td>{item.hora}</td><td>{item.sala}</td></tr>)}</tbody></table></div> : <p className="muted">No hay horario disponible.</p>}
+        {assignments.length ? <ScheduleTable assignments={assignments} emptyMessage="No hay horario disponible." showTeacher /> : <p className="muted">No hay horario disponible.</p>}
       </section>
       <section className="panel">
         <div className="section-title-row"><div><span className="eyebrow">Rendimiento académico</span><h3>Calificaciones</h3></div></div>
@@ -145,7 +146,7 @@ export function GuardianView({ section, username }: GuardianProps) {
 
   if (section === 'Mis asignaturas') return <section className="panel"><span className="eyebrow">Seguimiento académico</span><h1>Asignaturas de mis hijos</h1><p className="section-lead">Cada tabla corresponde a un hijo asociado y muestra su horario de clases.</p>{children.map((student) => <div className="child-section" key={student.username}><button type="button" className="child-section-title" onClick={() => openChild(student.username)}><strong>{student.nombre}</strong><span>{student.curso} · ver ficha →</span></button><AssignmentTable assignments={getAssignments(student)} /></div>)}</section>
 
-  if (section === 'Horario') return <section className="panel"><span className="eyebrow">Agenda familiar</span><h1>Horario de mis hijos</h1>{children.map((student) => <div className="child-section" key={student.username}><h3>{student.nombre}</h3><div className="schedule-grid">{[...new Set(getAssignments(student).map((item) => item.dia))].map((day) => <article className="schedule-card" key={day}><h3>{day}</h3>{getAssignments(student).filter((item) => item.dia === day).map((item, index) => <div className="schedule-session" key={`${item.asignatura}-${index}`}><strong>{item.hora} · {item.asignatura}</strong><span>{item.docente}</span><small>{item.sala}</small></div>)}</article>)}</div></div>)}</section>
+  if (section === 'Horario') return <section className="panel"><span className="eyebrow">Agenda familiar</span><h1>Horario de mis hijos</h1>{children.map((student) => <div className="child-section" key={student.username}><h3>{student.nombre}</h3><ScheduleTable assignments={getAssignments(student)} emptyMessage="No hay horario disponible." showTeacher /></div>)}</section>
 
   if (section === 'Asistencia') return <section className="panel"><span className="eyebrow">Seguimiento familiar</span><h1>Asistencia</h1><p className="section-lead">Porcentaje individual de asistencia para distinguir a cada hijo asociado.</p><div className="guardian-attendance-grid">{children.map((student) => <article className="attendance-child-card" key={student.username}><div><span className="eyebrow">{student.curso}</span><h3>{student.nombre}</h3></div><div className="big-number">{calculateAttendance(student)}%</div><span className="muted">Asistencia acumulada</span></article>)}</div></section>
 
@@ -158,7 +159,7 @@ export function GuardianView({ section, username }: GuardianProps) {
 }
 
 function AssignmentTable({ assignments }: { assignments: SubjectAssignment[] }) {
-  return assignments.length ? <div className="table-wrap"><table><thead><tr><th>Asignatura</th><th>Docente</th><th>Día</th><th>Hora</th><th>Sala</th></tr></thead><tbody>{assignments.map((item, index) => <tr key={`${item.asignatura}-${item.dia}-${index}`}><td><strong>{item.asignatura}</strong></td><td>{item.docente}</td><td>{item.dia}</td><td>{item.hora}</td><td>{item.sala}</td></tr>)}</tbody></table></div> : <p className="muted">No hay asignaturas asignadas.</p>
+  return assignments.length ? <ScheduleTable assignments={assignments} emptyMessage="No hay horario disponible." showTeacher /> : <p className="muted">No hay asignaturas asignadas.</p>
 }
 
 function GradeTable({ student, assignments }: { student: Student; assignments: SubjectAssignment[] }) {
