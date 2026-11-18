@@ -36,7 +36,7 @@ const teacherNames = ["Andrea Fernanda Silva Araya", "Ricardo Andrés Peña Muñ
 const subjects = ["Matemática", "Lenguaje y Comunicación", "Ciencias Naturales", "Historia", "Inglés", "Educación Física", "Artes Visuales", "Tecnología", "Filosofía", "Ciencias", "Geometría", "Música"];
 function subjectsForLevel(level) { const n = Number(String(level.label).match(/\d+/)?.[0] || 1); if (level.label.includes("Básico") && n <= 4) return ["Matemática", "Lenguaje y Comunicación", "Ciencias Naturales", "Historia", "Inglés", "Educación Física", "Artes Visuales"]; if (level.label.includes("Básico")) return ["Matemática", "Lenguaje y Comunicación", "Historia", "Ciencias Naturales", "Inglés", "Educación Física", "Artes Visuales", "Tecnología"]; return ["Matemática", "Lenguaje", "Historia", "Filosofía", "Inglés", "Ciencias", "Educación Física", "Geometría", "Música"]; }
 const levels = [];
-for (let i = 1; i <= 8; i++) levels.push({ label: `${i}° Básico`, slug: `${i}basico`, letters: ["A", "B", "C", "D"] });
+for (let i = 1; i <= 8; i++) levels.push({ label: `${i}° Básico`, slug: `${i}basico`, letters: i <= 4 ? ["A", "B", "C", "D"] : ["A", "B", "C"] });
 for (let i = 1; i <= 4; i++) levels.push({ label: `${i}° Medio`, slug: `${i}medio`, letters: ["A", "B", "C"] });
 const legacy = new Map([
   ["mrojas", ["María Fernanda Rojas González", "4° Medio A"]], ["jgomez", ["Joaquín Ignacio Gómez Pérez", "3° Medio B"]], ["lgonzalez", ["Lucía Valentina González Araya", "8° Básico A"]],
@@ -51,7 +51,8 @@ function isStudentPortalEligible(nivel) {
 }
 function alignChildSurname(childName, guardianName) { const child = String(childName || "").trim().split(/\s+/); const guardian = String(guardianName || "").trim().split(/\s+/); if (child.length < 4 || guardian.length < 4) return childName; const guardianIsMother = feminineFirstNames.includes(guardian[0]); const firstSurname = guardianIsMother ? child[2] : guardian[2]; const secondSurname = guardianIsMother ? guardian[3] : child[3]; return `${child[0]} ${child[1]} ${firstSurname} ${secondSurname}`; }
 function nameAt(index) { const masculine = index % 2 === 1; const firstPool = masculine ? masculineFirstNames : feminineFirstNames; const middlePool = masculine ? masculineMiddleNames : feminineMiddleNames; const poolIndex = Math.floor(index / 2); const firstIndex = poolIndex % firstPool.length; const middleIndex = Math.floor(poolIndex / firstPool.length) % middlePool.length; const lastIndex = (index * 17) % lastNames.length; const secondLastIndex = (Math.floor(index / lastNames.length) * 7 + index * 3) % secondLastNames.length; return `${firstPool[firstIndex]} ${middlePool[middleIndex]} ${lastNames[lastIndex]} ${secondLastNames[secondLastIndex]}`; }
-function teachersForLevel(level) { const cycle = level.label.includes("Básico") && Number(level.label.match(/\d+/)[0]) <= 4 ? 0 : level.label.includes("Básico") ? 14 : 30; const subjects = subjectsForLevel(level); return Object.fromEntries(subjects.map((subject, index) => [subject, [`docente${String(cycle + index * 2 + 1).padStart(2, "0")}`, `docente${String(cycle + index * 2 + 2).padStart(2, "0")}`]])); }
+function teacherUsernameAt(index) { return index === 0 ? "asilva" : `docente${String(index + 1).padStart(2, "0")}`; }
+function teachersForLevel(level, letter) { const number = Number(level.label.match(/\d+/)[0]); const sections = level.label.includes("Básico") && number <= 4 ? 4 : 3; const cycle = level.label.includes("Básico") && number <= 4 ? 0 : level.label.includes("Básico") ? 14 : 21; const letterIndex = level.letters.indexOf(letter); const subjects = subjectsForLevel(level); return Object.fromEntries(subjects.map((subject, index) => [subject, [teacherUsernameAt(cycle + index * sections + letterIndex)]])); }
 function emailForName(name, usedEmails) { const parts = String(name).trim().split(/\s+/); const clean = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, ""); const first = clean(parts[0]); const firstSurname = clean(parts[2] || parts[1]); const secondSurname = clean(parts[3]); const middle = clean(parts[1]); const base = `${first}${firstSurname}`; const candidates = [base, ...Array.from({ length: secondSurname.length }, (_, index) => `${base}${secondSurname.slice(0, index + 1)}`), ...Array.from({ length: middle.length }, (_, index) => `${base}${secondSurname}${middle.slice(0, index + 1)}`)]; const local = candidates.find((candidate) => !usedEmails?.has(`${candidate}@academy7.cl`)) || `${base}${secondSurname}${middle}${first}`; const email = `${local}@academy7.cl`; usedEmails?.add(email); return email; }
 function finalizeAccountEmails(accounts) { const clean = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, ""); const groups = new Map(); accounts.forEach((account) => { const parts = String(account.nombre || "").trim().split(/\s+/); const base = `${clean(parts[0])}${clean(parts[2] || parts[1])}`; if (!groups.has(base)) groups.set(base, []); groups.get(base).push({ account, secondSurname: clean(parts[3]), middle: clean(parts[1]) }); }); const used = new Set(); groups.forEach((group, base) => group.forEach(({ account, secondSurname, middle }) => { const prefixes = group.length === 1 ? [""] : Array.from({ length: secondSurname.length }, (_, index) => secondSurname.slice(0, index + 1)); const local = prefixes.map((prefix) => `${base}${prefix}`).concat(`${base}${secondSurname}${middle}${clean(account.nombre)}`).find((candidate) => !used.has(candidate)); used.add(local); account.email = `${local}@academy7.cl`; })); }
 async function createOrUpdateUser(account) {
@@ -77,6 +78,49 @@ async function removeStaleAcademyAccounts(accounts) {
     const aliasEmail = String(item.data().email ?? "").toLowerCase();
     if (!currentEmails.has(aliasEmail)) await item.ref.delete();
   }
+}
+async function removeDeletedBasicDData() {
+  const deletedCourseIds = new Set([5, 6, 7, 8].map((level) => `curso-${level}basico-D`));
+  const deletedStudents = new Set();
+  const studentSnapshot = await db.collection("students").get();
+  for (const item of studentSnapshot.docs) {
+    const data = item.data();
+    if (!/^([5-8])° Básico D$/.test(String(data.curso ?? ""))) continue;
+    deletedStudents.add(item.id);
+    await item.ref.delete();
+    await db.collection("users").doc(item.id).delete();
+    await db.collection("loginAliases").doc(item.id).delete();
+  }
+  const guardianSnapshot = await db.collection("guardians").get();
+  for (const item of guardianSnapshot.docs) {
+    const children = Array.isArray(item.data().children) ? item.data().children : [];
+    const remainingChildren = children.filter((child) => !deletedStudents.has(child));
+    if (remainingChildren.length === children.length) continue;
+    if (remainingChildren.length) {
+      await item.ref.set({ children: remainingChildren, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    } else {
+      await item.ref.delete();
+      await db.collection("users").doc(item.id).delete();
+      await db.collection("loginAliases").doc(item.id).delete();
+    }
+  }
+  const teacherSnapshot = await db.collection("teachers").get();
+  for (const teacher of teacherSnapshot.docs) {
+    for (const subcollection of ["courses", "schedule", "calendar"]) {
+      const records = await teacher.ref.collection(subcollection).get();
+      for (const record of records.docs) {
+        const data = record.data();
+        if (deletedCourseIds.has(data.courseId) || [...deletedCourseIds].some((courseId) => record.id.startsWith(courseId))) {
+          if (subcollection === "courses") {
+            const students = await record.ref.collection("students").get();
+            for (const student of students.docs) await student.ref.delete();
+          }
+          await record.ref.delete();
+        }
+      }
+    }
+  }
+  console.log(`Datos antiguos eliminados: ${deletedStudents.size} estudiantes y cursos 5°D–8°D.`);
 }
 const schoolDays = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
 const morningSlots = ["08:00–08:40", "08:40–09:20", "09:20–10:00", "10:10–10:50", "10:50–11:30", "11:30–12:10", "12:20–13:00", "13:00–13:40", "13:40–14:20"];
@@ -196,7 +240,7 @@ async function main() {
       courseStudents.push({ username, nombre, password: GENERATED_PASSWORD, email: emailForName(nombre, usedEmails), rol: "Estudiante", curso: `${level.label} ${letter}`, nivel: level.label });
       studentUsernames.push(username);
     }
-    courses.push({ id: courseId, teacherUsername, nombre: courseSubject, asignaturas: cycleSubjects, docentesPorAsignatura: teachersForLevel(level), curso: `${level.label} ${letter}`, sala: `Sala ${(courseIndex % 20) + 1}`, horario: "Lun / Mié / Vie · 08:00", periodo: "Año escolar 2026", students: courseStudents });
+    courses.push({ id: courseId, teacherUsername, nombre: courseSubject, asignaturas: cycleSubjects, docentesPorAsignatura: teachersForLevel(level, letter), curso: `${level.label} ${letter}`, sala: `Sala ${(courseIndex % 20) + 1}`, horario: "Lun / Mié / Vie · 08:00", periodo: "Año escolar 2026", students: courseStudents });
     courseIndex += 1;
   }
   const uniqueStudents = [...new Map(courses.flatMap((course) => course.students).map((student) => [student.username, student])).values()];
@@ -228,6 +272,7 @@ async function main() {
   accounts.forEach((account) => { if (account.rol === "Estudiante" && studentReferences.has(account.username)) Object.assign(account, studentReferences.get(account.username)); });
 
   const credentials = [];
+  await removeDeletedBasicDData();
   await removeStaleAcademyAccounts(accounts);
   console.log(`Inicio de sincronización: ${accounts.length} cuentas y ${courses.length} cursos.`);
   console.log(`Estudiantes sin cuenta propia, visibles para apoderados: ${uniqueStudents.length - studentPortalAccounts.length}`);
